@@ -1,59 +1,82 @@
 import { motion } from "framer-motion";
 import { useState } from "react";
-import { Plus } from "lucide-react";
-
-interface Expense {
-  id: string;
-  name: string;
-  amount: number;
-  category: string;
-}
-
-const categories = [
-  { id: "jewelry", label: "Trang sức", emoji: "💍", color: "bg-cinnabar/10 text-cinnabar" },
-  { id: "catering", label: "Tiệc", emoji: "🍽️", color: "bg-gold/10 text-gold" },
-  { id: "decor", label: "Trang trí", emoji: "🎊", color: "bg-cinnabar/10 text-cinnabar" },
-  { id: "photography", label: "Chụp ảnh", emoji: "📸", color: "bg-gold/10 text-gold" },
-  { id: "venue", label: "Địa điểm", emoji: "🏛️", color: "bg-cinnabar/10 text-cinnabar" },
-  { id: "other", label: "Khác", emoji: "📋", color: "bg-muted text-foreground" },
-];
-
-const initialExpenses: Expense[] = [
-  { id: "1", name: "Nhẫn cưới", amount: 25000000, category: "jewelry" },
-  { id: "2", name: "Tiệc 50 bàn", amount: 150000000, category: "catering" },
-  { id: "3", name: "Hoa tươi", amount: 15000000, category: "decor" },
-  { id: "4", name: "Studio chụp ảnh", amount: 20000000, category: "photography" },
-];
-
-const formatVND = (n: number) =>
-  new Intl.NumberFormat("vi-VN", { style: "currency", currency: "VND" }).format(n);
+import { Plus, Pencil, Trash2, Check, ChevronDown } from "lucide-react";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Category, Expense, formatVND } from "./expenses/types";
+import { seedCategories } from "./expenses/seedData";
+import ExpenseDialog from "./expenses/ExpenseDialog";
+import CategoryDialog from "./expenses/CategoryDialog";
+import ExpensePieChart from "./expenses/ExpensePieChart";
 
 const ExpenseTracker = () => {
-  const [expenses, setExpenses] = useState(initialExpenses);
-  const [showForm, setShowForm] = useState(false);
-  const [name, setName] = useState("");
-  const [amount, setAmount] = useState("");
-  const [category, setCategory] = useState("other");
+  const [categories, setCategories] = useState<Category[]>(seedCategories);
 
-  const total = expenses.reduce((s, e) => s + e.amount, 0);
-  const budget = 300000000;
-  const pct = Math.min((total / budget) * 100, 100);
+  // Dialogs
+  const [expDlg, setExpDlg] = useState<{ catId: string; expense?: Expense | null } | null>(null);
+  const [catDlg, setCatDlg] = useState<{ category?: Category | null } | null>(null);
 
-  const addExpense = () => {
-    if (!name.trim() || !amount) return;
-    setExpenses((prev) => [
+  // Totals
+  const allExpenses = categories.flatMap((c) => c.expenses);
+  const totalEstimate = allExpenses.reduce((s, e) => s + e.estimateCost, 0);
+  const totalActual = allExpenses.reduce((s, e) => s + e.actualCost, 0);
+  const totalPaid = allExpenses.filter((e) => e.paid).reduce((s, e) => s + e.actualCost, 0);
+  const pct = totalEstimate > 0 ? Math.min((totalActual / totalEstimate) * 100, 100) : 0;
+
+  // Category CRUD
+  const addCategory = (data: { name: string; emoji: string }) => {
+    setCategories((prev) => [
+      { id: Date.now().toString(), name: data.name, emoji: data.emoji, expenses: [] },
       ...prev,
-      { id: Date.now().toString(), name: name.trim(), amount: Number(amount), category },
     ]);
-    setName("");
-    setAmount("");
-    setShowForm(false);
   };
 
-  const byCat = categories.map((c) => ({
-    ...c,
-    total: expenses.filter((e) => e.category === c.id).reduce((s, e) => s + e.amount, 0),
-  }));
+  const editCategory = (id: string, data: { name: string; emoji: string }) => {
+    setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, ...data } : c)));
+  };
+
+  const deleteCategory = (id: string) => {
+    setCategories((prev) => prev.filter((c) => c.id !== id));
+  };
+
+  // Expense CRUD
+  const addExpense = (catId: string, data: Omit<Expense, "id">) => {
+    setCategories((prev) =>
+      prev.map((c) =>
+        c.id === catId
+          ? { ...c, expenses: [{ id: Date.now().toString(), ...data }, ...c.expenses] }
+          : c
+      )
+    );
+  };
+
+  const editExpense = (catId: string, expId: string, data: Omit<Expense, "id">) => {
+    setCategories((prev) =>
+      prev.map((c) =>
+        c.id === catId
+          ? { ...c, expenses: c.expenses.map((e) => (e.id === expId ? { ...e, ...data } : e)) }
+          : c
+      )
+    );
+  };
+
+  const deleteExpense = (catId: string, expId: string) => {
+    setCategories((prev) =>
+      prev.map((c) =>
+        c.id === catId ? { ...c, expenses: c.expenses.filter((e) => e.id !== expId) } : c
+      )
+    );
+  };
+
+  const togglePaid = (catId: string, expId: string) => {
+    setCategories((prev) =>
+      prev.map((c) =>
+        c.id === catId
+          ? { ...c, expenses: c.expenses.map((e) => (e.id === expId ? { ...e, paid: !e.paid } : e)) }
+          : c
+      )
+    );
+  };
 
   return (
     <section className="min-h-screen py-20 px-4 paper-texture">
@@ -62,148 +85,197 @@ const ExpenseTracker = () => {
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          className="text-center mb-12"
+          className="text-center mb-10"
         >
           <p className="font-handwritten text-xl text-cinnabar mb-2">Quản lý ngân sách</p>
           <h2 className="font-display text-4xl sm:text-5xl font-bold text-foreground mb-4">Chi Phí Đám Cưới</h2>
         </motion.div>
 
-        {/* Jar visualization */}
+        {/* Summary cards */}
         <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
+          initial={{ opacity: 0, scale: 0.95 }}
           whileInView={{ opacity: 1, scale: 1 }}
           viewport={{ once: true }}
-          className="bg-paper rounded-2xl shadow-card p-8 mb-8 text-center"
+          className="grid grid-cols-3 gap-3 mb-6"
         >
-          <div className="relative w-32 h-44 mx-auto mb-4">
-            {/* Jar body */}
-            <div className="absolute bottom-0 w-full h-40 border-2 border-cinnabar/30 rounded-b-3xl rounded-t-lg overflow-hidden bg-paper">
-              <motion.div
-                className="absolute bottom-0 w-full bg-gradient-to-t from-cinnabar/30 to-cinnabar/10"
-                initial={{ height: 0 }}
-                whileInView={{ height: `${pct}%` }}
-                viewport={{ once: true }}
-                transition={{ duration: 1.5, ease: "easeOut" }}
-              />
-            </div>
-            {/* Jar lid */}
-            <div className="absolute top-0 left-1/2 -translate-x-1/2 w-24 h-5 bg-cinnabar/20 rounded-t-lg border-2 border-cinnabar/30 border-b-0" />
+          <div className="bg-paper rounded-2xl shadow-card p-4 text-center">
+            <p className="font-body text-xs text-muted-foreground">Dự kiến</p>
+            <p className="font-display text-lg font-bold text-foreground">{formatVND(totalEstimate)}</p>
           </div>
-          <p className="font-display text-3xl font-bold text-foreground">{formatVND(total)}</p>
-          <p className="font-body text-sm text-muted-foreground">/ {formatVND(budget)} ngân sách</p>
-          <div className="w-full h-2 bg-muted rounded-full mt-4 overflow-hidden">
+          <div className="bg-paper rounded-2xl shadow-card p-4 text-center">
+            <p className="font-body text-xs text-muted-foreground">Thực tế</p>
+            <p className="font-display text-lg font-bold text-cinnabar">{formatVND(totalActual)}</p>
+          </div>
+          <div className="bg-paper rounded-2xl shadow-card p-4 text-center">
+            <p className="font-body text-xs text-muted-foreground">Đã trả</p>
+            <p className="font-display text-lg font-bold text-gold">{formatVND(totalPaid)}</p>
+          </div>
+        </motion.div>
+
+        {/* Progress bar */}
+        <div className="bg-paper rounded-2xl shadow-card p-4 mb-6">
+          <div className="flex justify-between font-body text-xs text-muted-foreground mb-2">
+            <span>Thực tế / Dự kiến</span>
+            <span>{pct.toFixed(0)}%</span>
+          </div>
+          <div className="w-full h-2.5 bg-muted rounded-full overflow-hidden">
             <motion.div
               className="h-full bg-primary rounded-full"
               initial={{ width: 0 }}
               whileInView={{ width: `${pct}%` }}
               viewport={{ once: true }}
-              transition={{ duration: 1, delay: 0.3 }}
+              transition={{ duration: 1 }}
             />
           </div>
-        </motion.div>
-
-        {/* Category breakdown */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8">
-          {byCat
-            .filter((c) => c.total > 0)
-            .map((c) => (
-              <motion.div
-                key={c.id}
-                initial={{ opacity: 0, y: 10 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                className={`${c.color} rounded-xl p-4 text-center`}
-              >
-                <span className="text-2xl">{c.emoji}</span>
-                <p className="font-body text-xs mt-1">{c.label}</p>
-                <p className="font-display text-sm font-semibold mt-1">{formatVND(c.total)}</p>
-              </motion.div>
-            ))}
         </div>
 
-        {/* Expense list */}
-        <div className="bg-paper rounded-2xl shadow-card overflow-hidden mb-4">
-          {expenses.map((e, i) => {
-            const cat = categories.find((c) => c.id === e.category);
-            return (
-              <motion.div
-                key={e.id}
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: i * 0.05 }}
-                className="flex items-center gap-3 px-5 py-3 border-b border-border/50 last:border-0"
-              >
-                <span className="text-lg">{cat?.emoji}</span>
-                <div className="flex-1">
-                  <p className="font-body text-sm text-foreground">{e.name}</p>
-                  <p className="font-body text-xs text-muted-foreground">{cat?.label}</p>
-                </div>
-                <p className="font-body text-sm font-semibold text-foreground">{formatVND(e.amount)}</p>
-              </motion.div>
-            );
-          })}
-        </div>
+        {/* Pie chart */}
+        <ExpensePieChart categories={categories} />
 
-        {/* Add expense */}
-        {showForm ? (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            className="bg-paper rounded-2xl shadow-card p-5 space-y-3"
-          >
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Tên chi phí..."
-              className="w-full bg-muted/50 rounded-xl px-4 py-2 text-sm font-body outline-none focus:ring-2 focus:ring-primary/20"
-            />
-            <input
-              value={amount}
-              onChange={(e) => setAmount(e.target.value.replace(/\D/g, ""))}
-              placeholder="Số tiền (VNĐ)..."
-              className="w-full bg-muted/50 rounded-xl px-4 py-2 text-sm font-body outline-none focus:ring-2 focus:ring-primary/20"
-            />
-            <div className="flex flex-wrap gap-2">
-              {categories.map((c) => (
-                <button
-                  key={c.id}
-                  onClick={() => setCategory(c.id)}
-                  className={`px-3 py-1 rounded-lg text-xs font-body transition-all ${
-                    category === c.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
-                  }`}
+        {/* Add category button */}
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={() => setCatDlg({ category: null })}
+          className="w-full bg-paper rounded-2xl shadow-card p-3 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground transition-colors font-body text-sm mb-4"
+        >
+          <Plus size={16} />
+          <span>Thêm danh mục mới</span>
+        </motion.button>
+
+        {/* Categories accordion */}
+        <ScrollArea className="h-[500px]">
+          <Accordion type="multiple" className="space-y-3">
+            {categories.map((cat) => {
+              const catEstimate = cat.expenses.reduce((s, e) => s + e.estimateCost, 0);
+              const catActual = cat.expenses.reduce((s, e) => s + e.actualCost, 0);
+
+              return (
+                <AccordionItem
+                  key={cat.id}
+                  value={cat.id}
+                  className="bg-paper rounded-2xl shadow-card border-0 overflow-hidden"
                 >
-                  {c.emoji} {c.label}
-                </button>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <motion.button
-                whileTap={{ scale: 0.95 }}
-                onClick={addExpense}
-                className="flex-1 bg-primary text-primary-foreground py-2 rounded-xl font-body text-sm font-semibold"
-              >
-                Thêm
-              </motion.button>
-              <button
-                onClick={() => setShowForm(false)}
-                className="px-4 py-2 rounded-xl font-body text-sm text-muted-foreground bg-muted"
-              >
-                Huỷ
-              </button>
-            </div>
-          </motion.div>
-        ) : (
-          <motion.button
-            whileHover={{ scale: 1.01 }}
-            whileTap={{ scale: 0.99 }}
-            onClick={() => setShowForm(true)}
-            className="w-full bg-paper rounded-2xl shadow-card p-4 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground transition-colors font-body"
-          >
-            <Plus size={18} />
-            <span>Thêm chi phí mới</span>
-          </motion.button>
-        )}
+                  <AccordionTrigger className="px-5 py-4 hover:no-underline">
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <span className="text-xl">{cat.emoji}</span>
+                      <div className="text-left min-w-0 flex-1">
+                        <p className="font-display text-sm font-bold text-foreground truncate">{cat.name}</p>
+                        <p className="font-body text-xs text-muted-foreground">
+                          {cat.expenses.length} mục • DK: {formatVND(catEstimate)} • TT: {formatVND(catActual)}
+                        </p>
+                      </div>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-5 pb-4">
+                    {/* Category actions */}
+                    <div className="flex gap-2 mb-3">
+                      <button
+                        onClick={() => setExpDlg({ catId: cat.id, expense: null })}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-body font-semibold hover:bg-primary/20 transition-colors"
+                      >
+                        <Plus size={14} /> Thêm chi phí
+                      </button>
+                      <button
+                        onClick={() => setCatDlg({ category: cat })}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-muted text-muted-foreground text-xs font-body hover:bg-muted/80 transition-colors"
+                      >
+                        <Pencil size={12} /> Sửa
+                      </button>
+                      <button
+                        onClick={() => deleteCategory(cat.id)}
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-destructive/10 text-destructive text-xs font-body hover:bg-destructive/20 transition-colors"
+                      >
+                        <Trash2 size={12} /> Xoá
+                      </button>
+                    </div>
+
+                    {/* Expense list */}
+                    {cat.expenses.length === 0 ? (
+                      <p className="font-body text-xs text-muted-foreground text-center py-4">Chưa có chi phí nào</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {cat.expenses.map((exp) => (
+                          <div
+                            key={exp.id}
+                            className={`flex items-start gap-3 p-3 rounded-xl transition-colors ${
+                              exp.paid ? "bg-primary/5" : "bg-muted/30"
+                            }`}
+                          >
+                            <button
+                              onClick={() => togglePaid(cat.id, exp.id)}
+                              className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all ${
+                                exp.paid
+                                  ? "bg-primary border-primary text-primary-foreground"
+                                  : "border-muted-foreground/30"
+                              }`}
+                            >
+                              {exp.paid && <Check size={12} />}
+                            </button>
+                            <div className="flex-1 min-w-0">
+                              <p className={`font-body text-sm ${exp.paid ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                                {exp.name}
+                              </p>
+                              <div className="flex gap-3 mt-1">
+                                <span className="font-body text-xs text-muted-foreground">
+                                  DK: {formatVND(exp.estimateCost)}
+                                </span>
+                                <span className="font-body text-xs text-cinnabar">
+                                  TT: {formatVND(exp.actualCost)}
+                                </span>
+                              </div>
+                            </div>
+                            <div className="flex gap-1 shrink-0">
+                              <button
+                                onClick={() => setExpDlg({ catId: cat.id, expense: exp })}
+                                className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground"
+                              >
+                                <Pencil size={13} />
+                              </button>
+                              <button
+                                onClick={() => deleteExpense(cat.id, exp.id)}
+                                className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </AccordionContent>
+                </AccordionItem>
+              );
+            })}
+          </Accordion>
+        </ScrollArea>
       </div>
+
+      {/* Dialogs */}
+      <ExpenseDialog
+        open={!!expDlg}
+        onClose={() => setExpDlg(null)}
+        expense={expDlg?.expense}
+        onSave={(data) => {
+          if (!expDlg) return;
+          if (expDlg.expense) {
+            editExpense(expDlg.catId, expDlg.expense.id, data);
+          } else {
+            addExpense(expDlg.catId, data);
+          }
+        }}
+      />
+      <CategoryDialog
+        open={!!catDlg}
+        onClose={() => setCatDlg(null)}
+        initial={catDlg?.category ? { name: catDlg.category.name, emoji: catDlg.category.emoji } : null}
+        onSave={(data) => {
+          if (catDlg?.category) {
+            editCategory(catDlg.category.id, data);
+          } else {
+            addCategory(data);
+          }
+        }}
+      />
     </section>
   );
 };
