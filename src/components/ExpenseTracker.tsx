@@ -80,7 +80,7 @@ const ExpenseTracker = () => {
 
   return (
     <section className="min-h-screen py-20 px-4 paper-texture">
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -136,118 +136,147 @@ const ExpenseTracker = () => {
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={() => setCatDlg({ category: null })}
-          className="w-full bg-paper rounded-2xl shadow-card p-3 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground transition-colors font-body text-sm mb-4"
+          className="w-full bg-paper rounded-2xl shadow-card p-3 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground transition-colors font-body text-sm mb-6"
         >
           <Plus size={16} />
           <span>Thêm danh mục mới</span>
         </motion.button>
 
-        {/* Categories accordion */}
-        <ScrollArea className="h-[500px]">
-          <Accordion type="multiple" className="space-y-3">
-            {categories.map((cat) => {
-              const catEstimate = cat.expenses.reduce((s, e) => s + e.estimateCost, 0);
-              const catActual = cat.expenses.reduce((s, e) => s + e.actualCost, 0);
+        {/* Categories as cards grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {categories.map((cat, i) => {
+            const catEstimate = cat.expenses.reduce((s, e) => s + e.estimateCost, 0);
+            const catActual = cat.expenses.reduce((s, e) => s + e.actualCost, 0);
+            const isOpen = openCards.includes(cat.id);
 
-              return (
-                <AccordionItem
-                  key={cat.id}
-                  value={cat.id}
-                  className="bg-paper rounded-2xl shadow-card border-0 overflow-hidden"
-                >
-                  <AccordionTrigger className="px-5 py-4 hover:no-underline">
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <span className="text-xl">{cat.emoji}</span>
-                      <div className="text-left min-w-0 flex-1">
-                        <p className="font-display text-sm font-bold text-foreground truncate">{cat.name}</p>
-                        <p className="font-body text-xs text-muted-foreground">
-                          {cat.expenses.length} mục • DK: {formatVND(catEstimate)} • TT: {formatVND(catActual)}
-                        </p>
-                      </div>
-                    </div>
-                  </AccordionTrigger>
-                  <AccordionContent className="px-5 pb-4">
-                    {/* Category actions */}
-                    <div className="flex gap-2 mb-3">
-                      <button
-                        onClick={() => setExpDlg({ catId: cat.id, expense: null })}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-body font-semibold hover:bg-primary/20 transition-colors"
-                      >
-                        <Plus size={14} /> Thêm chi phí
-                      </button>
-                      <button
-                        onClick={() => setCatDlg({ category: cat })}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-muted text-muted-foreground text-xs font-body hover:bg-muted/80 transition-colors"
-                      >
-                        <Pencil size={12} /> Sửa
-                      </button>
-                      <button
-                        onClick={() => deleteCategory(cat.id)}
-                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-destructive/10 text-destructive text-xs font-body hover:bg-destructive/20 transition-colors"
-                      >
-                        <Trash2 size={12} /> Xoá
-                      </button>
-                    </div>
+            return (
+              <motion.div
+                key={cat.id}
+                initial={{ opacity: 0, y: 30, rotate: 0 }}
+                whileInView={{ opacity: 1, y: 0, rotate: i % 3 === 0 ? -1.5 : i % 3 === 1 ? 1 : -0.5 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.6, delay: (i % 6) * 0.08, ease: [0.34, 1.56, 0.64, 1] }}
+                whileHover={{ rotate: 0, scale: 1.02, y: -3 }}
+                className="relative bg-paper rounded-2xl shadow-card overflow-hidden"
+              >
+                {/* Tape */}
+                <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-14 h-5 bg-gold-light/70 rounded-sm rotate-[-1deg]" />
 
-                    {/* Expense list */}
+                {/* Card header — always visible */}
+                <div className="p-5 pt-6">
+                  <span className="text-3xl mb-2 block">{cat.emoji}</span>
+                  <h3 className="font-display text-base font-bold text-foreground mb-1 truncate">{cat.name}</h3>
+                  <p className="font-body text-xs text-muted-foreground mb-1">
+                    {cat.expenses.length} mục
+                  </p>
+                  <div className="flex gap-3 font-body text-xs">
+                    <span className="text-muted-foreground">DK: {formatVND(catEstimate)}</span>
+                    <span className="text-cinnabar">TT: {formatVND(catActual)}</span>
+                  </div>
+
+                  {/* Toggle & actions */}
+                  <div className="flex items-center gap-2 mt-3">
+                    <button
+                      onClick={() =>
+                        setOpenCards((prev) =>
+                          prev.includes(cat.id) ? prev.filter((id) => id !== cat.id) : [...prev, cat.id]
+                        )
+                      }
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-body font-semibold hover:bg-primary/20 transition-colors"
+                    >
+                      <ChevronDown size={14} className={`transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`} />
+                      {isOpen ? "Thu gọn" : "Chi tiết"}
+                    </button>
+                    <button
+                      onClick={() => setCatDlg({ category: cat })}
+                      className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground"
+                    >
+                      <Pencil size={13} />
+                    </button>
+                    <button
+                      onClick={() => deleteCategory(cat.id)}
+                      className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive"
+                    >
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Expandable expense list */}
+                {isOpen && (
+                  <motion.div
+                    initial={{ height: 0, opacity: 0 }}
+                    animate={{ height: "auto", opacity: 1 }}
+                    transition={{ duration: 0.3 }}
+                    className="border-t border-border px-5 pb-4 pt-3"
+                  >
+                    <button
+                      onClick={() => setExpDlg({ catId: cat.id, expense: null })}
+                      className="w-full flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg bg-primary/10 text-primary text-xs font-body font-semibold hover:bg-primary/20 transition-colors mb-3"
+                    >
+                      <Plus size={14} /> Thêm chi phí
+                    </button>
+
                     {cat.expenses.length === 0 ? (
-                      <p className="font-body text-xs text-muted-foreground text-center py-4">Chưa có chi phí nào</p>
+                      <p className="font-body text-xs text-muted-foreground text-center py-3">Chưa có chi phí nào</p>
                     ) : (
-                      <div className="space-y-2">
-                        {cat.expenses.map((exp) => (
-                          <div
-                            key={exp.id}
-                            className={`flex items-start gap-3 p-3 rounded-xl transition-colors ${
-                              exp.paid ? "bg-primary/5" : "bg-muted/30"
-                            }`}
-                          >
-                            <button
-                              onClick={() => togglePaid(cat.id, exp.id)}
-                              className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition-all ${
-                                exp.paid
-                                  ? "bg-primary border-primary text-primary-foreground"
-                                  : "border-muted-foreground/30"
+                      <ScrollArea className="max-h-[260px]">
+                        <div className="space-y-2">
+                          {cat.expenses.map((exp) => (
+                            <div
+                              key={exp.id}
+                              className={`flex items-start gap-2 p-2.5 rounded-xl transition-colors ${
+                                exp.paid ? "bg-primary/5" : "bg-muted/30"
                               }`}
                             >
-                              {exp.paid && <Check size={12} />}
-                            </button>
-                            <div className="flex-1 min-w-0">
-                              <p className={`font-body text-sm ${exp.paid ? "line-through text-muted-foreground" : "text-foreground"}`}>
-                                {exp.name}
-                              </p>
-                              <div className="flex gap-3 mt-1">
-                                <span className="font-body text-xs text-muted-foreground">
-                                  DK: {formatVND(exp.estimateCost)}
-                                </span>
-                                <span className="font-body text-xs text-cinnabar">
-                                  TT: {formatVND(exp.actualCost)}
-                                </span>
+                              <button
+                                onClick={() => togglePaid(cat.id, exp.id)}
+                                className={`mt-0.5 w-4 h-4 rounded-md border-2 flex items-center justify-center shrink-0 transition-all ${
+                                  exp.paid
+                                    ? "bg-primary border-primary text-primary-foreground"
+                                    : "border-muted-foreground/30"
+                                }`}
+                              >
+                                {exp.paid && <Check size={10} />}
+                              </button>
+                              <div className="flex-1 min-w-0">
+                                <p className={`font-body text-xs ${exp.paid ? "line-through text-muted-foreground" : "text-foreground"}`}>
+                                  {exp.name}
+                                </p>
+                                <div className="flex gap-2 mt-0.5">
+                                  <span className="font-body text-[10px] text-muted-foreground">
+                                    DK: {formatVND(exp.estimateCost)}
+                                  </span>
+                                  <span className="font-body text-[10px] text-cinnabar">
+                                    TT: {formatVND(exp.actualCost)}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex gap-0.5 shrink-0">
+                                <button
+                                  onClick={() => setExpDlg({ catId: cat.id, expense: exp })}
+                                  className="p-1 rounded-lg hover:bg-muted transition-colors text-muted-foreground"
+                                >
+                                  <Pencil size={11} />
+                                </button>
+                                <button
+                                  onClick={() => deleteExpense(cat.id, exp.id)}
+                                  className="p-1 rounded-lg hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive"
+                                >
+                                  <Trash2 size={11} />
+                                </button>
                               </div>
                             </div>
-                            <div className="flex gap-1 shrink-0">
-                              <button
-                                onClick={() => setExpDlg({ catId: cat.id, expense: exp })}
-                                className="p-1.5 rounded-lg hover:bg-muted transition-colors text-muted-foreground"
-                              >
-                                <Pencil size={13} />
-                              </button>
-                              <button
-                                onClick={() => deleteExpense(cat.id, exp.id)}
-                                className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive"
-                              >
-                                <Trash2 size={13} />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
                     )}
-                  </AccordionContent>
-                </AccordionItem>
-              );
-            })}
-          </Accordion>
-        </ScrollArea>
+                  </motion.div>
+                )}
+              </motion.div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Dialogs */}
