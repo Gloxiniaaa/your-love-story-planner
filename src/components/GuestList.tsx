@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
-import { Plus, X, Users, Search, Pencil, Armchair } from "lucide-react";
+import { Plus, Users, Search, Pencil, Armchair } from "lucide-react";
+import DeleteButton from "./DeleteButton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Dialog,
