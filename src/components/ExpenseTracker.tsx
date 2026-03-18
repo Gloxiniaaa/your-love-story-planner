@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { useState } from "react";
-import { Plus, Pencil, Trash2, Check, ChevronDown } from "lucide-react";
+import { Plus, Pencil, Check, ChevronDown } from "lucide-react";
+import DeleteButton from "./DeleteButton";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Category, Expense, formatVND } from "./expenses/types";
