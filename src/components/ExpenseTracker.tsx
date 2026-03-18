@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
 import { useState } from "react";
-import { Plus, Pencil, Trash2, Check, ChevronDown } from "lucide-react";
+import { Plus, Pencil, Check, ChevronDown } from "lucide-react";
+import DeleteButton from "./DeleteButton";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Category, Expense, formatVND } from "./expenses/types";
@@ -194,12 +195,7 @@ const ExpenseTracker = () => {
                     >
                       <Pencil size={13} />
                     </button>
-                    <button
-                      onClick={() => deleteCategory(cat.id)}
-                      className="p-1.5 rounded-lg hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive"
-                    >
-                      <Trash2 size={13} />
-                    </button>
+                    <DeleteButton onDelete={() => deleteCategory(cat.id)} size={13} />
                   </div>
                 </div>
 
@@ -260,12 +256,7 @@ const ExpenseTracker = () => {
                                 >
                                   <Pencil size={11} />
                                 </button>
-                                <button
-                                  onClick={() => deleteExpense(cat.id, exp.id)}
-                                  className="p-1 rounded-lg hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive"
-                                >
-                                  <Trash2 size={11} />
-                                </button>
+                                <DeleteButton onDelete={() => deleteExpense(cat.id, exp.id)} size={11} />
                               </div>
                             </div>
                           ))}

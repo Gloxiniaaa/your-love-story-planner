@@ -1,6 +1,17 @@
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useState } from "react";
+import { Plus, Pencil } from "lucide-react";
 import BalloonSvg from "./BalloonSvg";
+import DeleteButton from "./DeleteButton";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 interface Milestone {
   id: string;
@@ -11,6 +22,11 @@ interface Milestone {
   emoji: string;
 }
 
+const parseDateDMY = (d: string) => {
+  const [day, month, year] = d.split("/").map(Number);
+  return new Date(year, month - 1, day).getTime();
+};
+
 const initialMilestones: Milestone[] = [
   { id: "1", title: "Lễ Dạm Ngõ", subtitle: "Lễ chạm ngõ — gặp gỡ hai gia đình", date: "01/06/2025", completed: true, emoji: "🏠" },
   { id: "2", title: "Lễ Ăn Hỏi", subtitle: "Lễ đính hôn — trao tráp và sính lễ", date: "01/09/2025", completed: true, emoji: "🎁" },
@@ -20,13 +36,58 @@ const initialMilestones: Milestone[] = [
   { id: "6", title: "Tuần Trăng Mật", subtitle: "Khoảng thời gian cho riêng hai người", date: "20/12/2025", completed: false, emoji: "✈️" },
 ];
 
+interface MilestoneForm {
+  title: string;
+  subtitle: string;
+  date: string;
+  emoji: string;
+}
+
+const emptyForm: MilestoneForm = { title: "", subtitle: "", date: "", emoji: "🎉" };
+
 const MilestoneTimeline = () => {
   const [milestones, setMilestones] = useState(initialMilestones);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editing, setEditing] = useState<Milestone | null>(null);
+  const [form, setForm] = useState<MilestoneForm>(emptyForm);
+
+  const sorted = [...milestones].sort((a, b) => parseDateDMY(a.date) - parseDateDMY(b.date));
 
   const toggleMilestone = (id: string) => {
     setMilestones((prev) =>
       prev.map((m) => (m.id === id ? { ...m, completed: !m.completed } : m))
     );
+  };
+
+  const openAdd = () => {
+    setEditing(null);
+    setForm(emptyForm);
+    setDialogOpen(true);
+  };
+
+  const openEdit = (m: Milestone) => {
+    setEditing(m);
+    setForm({ title: m.title, subtitle: m.subtitle, date: m.date, emoji: m.emoji });
+    setDialogOpen(true);
+  };
+
+  const handleSave = () => {
+    if (!form.title.trim() || !form.date.trim()) return;
+    if (editing) {
+      setMilestones((prev) =>
+        prev.map((m) => (m.id === editing.id ? { ...m, ...form } : m))
+      );
+    } else {
+      setMilestones((prev) => [
+        ...prev,
+        { id: Date.now().toString(), ...form, completed: false },
+      ]);
+    }
+    setDialogOpen(false);
+  };
+
+  const deleteMilestone = (id: string) => {
+    setMilestones((prev) => prev.filter((m) => m.id !== id));
   };
 
   const completedCount = milestones.filter((m) => m.completed).length;
@@ -58,58 +119,136 @@ const MilestoneTimeline = () => {
           </div>
         </motion.div>
 
-        <div className="relative border-l-2 border-dashed border-cinnabar/30 ml-6 pl-8 space-y-12">
-          {milestones.map((m, i) => (
-            <motion.div
-              key={m.id}
-              initial={{ opacity: 0, x: -20 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: i * 0.1 }}
-              className="relative cursor-pointer group"
-              onClick={() => toggleMilestone(m.id)}
-            >
-              {/* Node */}
-              <div className="absolute -left-[41px] top-1">
-                {m.completed ? (
-                  <BalloonSvg size={28} color="hsl(5, 75%, 45%)" />
-                ) : (
-                  <div className="w-4 h-4 rounded-full border-2 border-muted-foreground/30 bg-paper mt-1 ml-1.5" />
-                )}
-              </div>
+        {/* Add button */}
+        <motion.button
+          whileTap={{ scale: 0.97 }}
+          onClick={openAdd}
+          className="w-full bg-paper rounded-2xl shadow-card p-3 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground transition-colors font-body text-sm mb-8"
+        >
+          <Plus size={16} />
+          <span>Thêm cột mốc mới</span>
+        </motion.button>
 
+        <div className="relative border-l-2 border-dashed border-cinnabar/30 ml-6 pl-8 space-y-12">
+          <AnimatePresence mode="popLayout">
+            {sorted.map((m, i) => (
               <motion.div
-                whileHover={{ x: 4 }}
-                className={`bg-paper rounded-xl p-5 shadow-card transition-all ${
-                  m.completed ? "border-l-4 border-l-cinnabar" : "opacity-60"
-                }`}
+                key={m.id}
+                layout
+                initial={{ opacity: 0, x: -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                transition={{ duration: 0.6, delay: i * 0.1 }}
+                className="relative group"
               >
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl">{m.emoji}</span>
-                      <h3 className="font-display text-xl font-semibold text-foreground">{m.title}</h3>
-                    </div>
-                    <p className="font-body text-sm text-muted-foreground mt-1">{m.subtitle}</p>
-                  </div>
-                  <span className="font-body text-xs text-muted-foreground bg-muted px-2 py-1 rounded-lg shrink-0">
-                    {m.date}
-                  </span>
+                {/* Node */}
+                <div className="absolute -left-[41px] top-1">
+                  {m.completed ? (
+                    <BalloonSvg size={28} color="hsl(5, 75%, 45%)" />
+                  ) : (
+                    <div className="w-4 h-4 rounded-full border-2 border-muted-foreground/30 bg-paper mt-1 ml-1.5" />
+                  )}
                 </div>
-                {m.completed && (
-                  <motion.p
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="font-handwritten text-cinnabar text-sm mt-2"
-                  >
-                    ✓ Đã hoàn thành!
-                  </motion.p>
-                )}
+
+                <motion.div
+                  whileHover={{ x: 4 }}
+                  className={`bg-paper rounded-xl p-5 shadow-card transition-all ${
+                    m.completed ? "border-l-4 border-l-cinnabar" : "opacity-60"
+                  }`}
+                >
+                  <div className="flex items-start justify-between">
+                    <div
+                      className="flex-1 cursor-pointer"
+                      onClick={() => toggleMilestone(m.id)}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl">{m.emoji}</span>
+                        <h3 className="font-display text-xl font-semibold text-foreground">{m.title}</h3>
+                      </div>
+                      <p className="font-body text-sm text-muted-foreground mt-1">{m.subtitle}</p>
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0 ml-2">
+                      <span className="font-body text-xs text-muted-foreground bg-muted px-2 py-1 rounded-lg">
+                        {m.date}
+                      </span>
+                      <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all">
+                        <button
+                          onClick={() => openEdit(m)}
+                          className="p-1 rounded-lg hover:bg-muted transition-colors text-muted-foreground"
+                        >
+                          <Pencil size={13} />
+                        </button>
+                        <DeleteButton onDelete={() => deleteMilestone(m.id)} size={13} />
+                      </div>
+                    </div>
+                  </div>
+                  {m.completed && (
+                    <motion.p
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      className="font-handwritten text-cinnabar text-sm mt-2"
+                    >
+                      ✓ Đã hoàn thành!
+                    </motion.p>
+                  )}
+                </motion.div>
               </motion.div>
-            </motion.div>
-          ))}
+            ))}
+          </AnimatePresence>
         </div>
       </div>
+
+      {/* Add/Edit Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display">
+              {editing ? "Chỉnh sửa cột mốc" : "Thêm cột mốc mới"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div>
+              <label className="font-body text-sm text-muted-foreground mb-1 block">Emoji</label>
+              <Input
+                value={form.emoji}
+                onChange={(e) => setForm((f) => ({ ...f, emoji: e.target.value }))}
+                placeholder="🎉"
+                className="w-20"
+              />
+            </div>
+            <div>
+              <label className="font-body text-sm text-muted-foreground mb-1 block">Tên cột mốc *</label>
+              <Input
+                value={form.title}
+                onChange={(e) => setForm((f) => ({ ...f, title: e.target.value }))}
+                placeholder="Nhập tên..."
+              />
+            </div>
+            <div>
+              <label className="font-body text-sm text-muted-foreground mb-1 block">Mô tả</label>
+              <Input
+                value={form.subtitle}
+                onChange={(e) => setForm((f) => ({ ...f, subtitle: e.target.value }))}
+                placeholder="Mô tả ngắn..."
+              />
+            </div>
+            <div>
+              <label className="font-body text-sm text-muted-foreground mb-1 block">Ngày (dd/mm/yyyy) *</label>
+              <Input
+                value={form.date}
+                onChange={(e) => setForm((f) => ({ ...f, date: e.target.value }))}
+                placeholder="01/01/2025"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDialogOpen(false)}>Hủy</Button>
+            <Button onClick={handleSave} disabled={!form.title.trim() || !form.date.trim()}>
+              {editing ? "Lưu" : "Thêm"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 };
