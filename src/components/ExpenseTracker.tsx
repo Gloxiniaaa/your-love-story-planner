@@ -15,6 +15,7 @@ const ExpenseTracker = () => {
   // Dialogs
   const [expDlg, setExpDlg] = useState<{ catId: string; expense?: Expense | null } | null>(null);
   const [catDlg, setCatDlg] = useState<{ category?: Category | null } | null>(null);
+  const [openCards, setOpenCards] = useState<string[]>([]);
 
   // Totals
   const allExpenses = categories.flatMap((c) => c.expenses);
