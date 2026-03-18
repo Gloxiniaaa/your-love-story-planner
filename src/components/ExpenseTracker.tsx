@@ -256,12 +256,7 @@ const ExpenseTracker = () => {
                                 >
                                   <Pencil size={11} />
                                 </button>
-                                <button
-                                  onClick={() => deleteExpense(cat.id, exp.id)}
-                                  className="p-1 rounded-lg hover:bg-destructive/10 transition-colors text-muted-foreground hover:text-destructive"
-                                >
-                                  <Trash2 size={11} />
-                                </button>
+                                <DeleteButton onDelete={() => deleteExpense(cat.id, exp.id)} size={11} />
                               </div>
                             </div>
                           ))}

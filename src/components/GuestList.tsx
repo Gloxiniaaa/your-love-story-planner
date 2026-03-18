@@ -328,12 +328,7 @@ const GuestCard = ({ title, guests, tint, side, onAdd, onEdit, onRemove, onToggl
                     >
                       <Pencil size={13} />
                     </button>
-                    <button
-                      onClick={() => onRemove(guest.id)}
-                      className="text-muted-foreground hover:text-destructive transition-colors p-1"
-                    >
-                      <X size={14} />
-                    </button>
+                    <DeleteButton onDelete={() => onRemove(guest.id)} size={13} />
                   </div>
                 </motion.div>
               ))}
