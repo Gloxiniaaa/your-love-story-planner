@@ -4,6 +4,8 @@ import { Pencil } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { BalloonCluster } from "./BalloonSvg";
 import FlipClock from "./FlipClock";
+import { useCreateWedding, useMyWedding, useUpdateWedding } from "@/api/Wedding/querries";
+import type { WeddingInfo } from "@/api/Wedding/types";
 import {
   Dialog,
   DialogContent,
@@ -14,18 +16,12 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 
-export interface WeddingInfo {
-  name1: string;
-  name2: string;
-  date: string;
-  location: string;
-  tagline: string;
-}
+export type { WeddingInfo };
 
 const defaultInfo: WeddingInfo = {
   name1: "Minh",
   name2: "Anh",
-  date: "15/12/2025",
+  date: "15/12/2026",
   location: "Hà Nội",
   tagline: "Cuộc phiêu lưu vĩ đại nhất bắt đầu từ một tiếng 'Dạ'",
 };
@@ -37,7 +33,15 @@ interface HeroSectionProps {
 }
 
 const HeroSection = ({ info, onInfoChange, readOnly = false }: HeroSectionProps) => {
-  const data = info || defaultInfo;
+  const isControlled = !!info;
+  const isTokenAvailable = !!localStorage.getItem("access_token");
+
+  const weddingQuery = useMyWedding();
+  const createWeddingMutation = useCreateWedding();
+  const updateWeddingMutation = useUpdateWedding();
+
+  const apiInfo = weddingQuery.data ?? null;
+  const data = info ?? apiInfo ?? defaultInfo;
   const [editOpen, setEditOpen] = useState(false);
   const [form, setForm] = useState<WeddingInfo>(data);
   const navigate = useNavigate();
@@ -48,11 +52,26 @@ const HeroSection = ({ info, onInfoChange, readOnly = false }: HeroSectionProps)
   };
 
   const handleSave = () => {
-    onInfoChange?.(form);
-    setEditOpen(false);
+    if (onInfoChange) {
+      onInfoChange(form);
+      setEditOpen(false);
+      return;
+    }
+
+    if (!isTokenAvailable) return;
+
+    const hasWedding = !!apiInfo;
+    const mutation = hasWedding ? updateWeddingMutation : createWeddingMutation;
+    mutation.mutate(form, {
+      onSuccess: () => setEditOpen(false),
+    });
   };
 
   const formattedDate = data.date.replace(/\//g, " · ");
+  const canEdit = !readOnly && (onInfoChange || isTokenAvailable);
+  const isSaving = createWeddingMutation.isPending || updateWeddingMutation.isPending;
+  const saveError =
+    (createWeddingMutation.error as any)?.message || (updateWeddingMutation.error as any)?.message || "";
 
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden paper-texture px-4">
@@ -67,7 +86,7 @@ const HeroSection = ({ info, onInfoChange, readOnly = false }: HeroSectionProps)
       </div>
 
       {/* Edit button */}
-      {!readOnly && onInfoChange && (
+      {canEdit && (
         <motion.button
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -154,7 +173,7 @@ const HeroSection = ({ info, onInfoChange, readOnly = false }: HeroSectionProps)
             transition={{ duration: 0.6, delay: 1.3, ease: [0.34, 1.56, 0.64, 1] }}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98, y: 2 }}
-            onClick={() => navigate("/invitation")}
+            onClick={() => navigate("/invitation", { state: { weddingInfo: data } })}
             className="bg-primary text-primary-foreground px-10 py-4 rounded-2xl shadow-button active:shadow-none active:translate-y-[2px] transition-all font-body font-semibold text-lg"
           >
             Gửi Lời Mời 💌
@@ -207,6 +226,14 @@ const HeroSection = ({ info, onInfoChange, readOnly = false }: HeroSectionProps)
             <DialogTitle className="font-display">Chỉnh sửa thông tin</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 py-2">
+            {!isControlled && weddingQuery.isLoading && (
+              <p className="text-sm text-muted-foreground font-body">Đang tải dữ liệu từ máy chủ…</p>
+            )}
+            {!isControlled && weddingQuery.isError && (
+              <p className="text-sm text-destructive font-body">
+                Không thể tải dữ liệu cưới. Bạn vẫn có thể chỉnh sửa và lưu lại.
+              </p>
+            )}
             <div>
               <label className="font-body text-sm text-muted-foreground mb-1 block">Tên cô dâu</label>
               <Input value={form.name1} onChange={(e) => setForm((f) => ({ ...f, name1: e.target.value }))} />
@@ -227,10 +254,15 @@ const HeroSection = ({ info, onInfoChange, readOnly = false }: HeroSectionProps)
               <label className="font-body text-sm text-muted-foreground mb-1 block">Slogan</label>
               <Input value={form.tagline} onChange={(e) => setForm((f) => ({ ...f, tagline: e.target.value }))} />
             </div>
+            {!isControlled && saveError && (
+              <p className="text-sm text-destructive font-body">Lưu thất bại: {saveError}</p>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditOpen(false)}>Hủy</Button>
-            <Button onClick={handleSave}>Lưu</Button>
+            <Button onClick={handleSave} disabled={!onInfoChange && !isTokenAvailable || isSaving}>
+              {isSaving ? "Đang lưu…" : "Lưu"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

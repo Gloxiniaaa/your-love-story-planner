@@ -5,7 +5,7 @@ import MilestoneTimelineReadOnly from "@/components/MilestoneTimelineReadOnly";
 const defaultInfo: WeddingInfo = {
   name1: "Minh",
   name2: "Anh",
-  date: "15/12/2025",
+  date: "15/12/2026",
   location: "Hà Nội",
   tagline: "Cuộc phiêu lưu vĩ đại nhất bắt đầu từ một tiếng 'Dạ'",
 };

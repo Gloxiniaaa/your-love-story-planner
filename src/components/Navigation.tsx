@@ -19,7 +19,7 @@ const Navigation = ({ activeSection, onNavigate }: NavigationProps) => (
     initial={{ y: 100, opacity: 0 }}
     animate={{ y: 0, opacity: 1 }}
     transition={{ type: "spring", stiffness: 200, damping: 20, delay: 0.5 }}
-    className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-paper/90 backdrop-blur-md rounded-2xl shadow-warm px-2 py-2 flex gap-1"
+    className="fixed bottom-6 right-1 -translate-x-1/2 z-50 bg-paper/90 backdrop-blur-md rounded-2xl shadow-warm px-2 py-2 flex gap-1"
     style={{ willChange: "transform" }}
   >
     {navItems.map((item) => {

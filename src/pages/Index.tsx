@@ -1,25 +1,18 @@
-import { useState } from "react";
 import Navigation from "@/components/Navigation";
-import HeroSection, { WeddingInfo } from "@/components/HeroSection";
+import HeroSection from "@/components/HeroSection";
 import MilestoneTimeline from "@/components/MilestoneTimeline";
 import GuestList from "@/components/GuestList";
 import ExpenseTracker from "@/components/ExpenseTracker";
 import WeddingTips from "@/components/WeddingTips";
+import { useState } from "react";
 
 const Index = () => {
   const [activeSection, setActiveSection] = useState("home");
-  const [weddingInfo, setWeddingInfo] = useState<WeddingInfo>({
-    name1: "Minh",
-    name2: "Anh",
-    date: "15/12/2025",
-    location: "Hà Nội",
-    tagline: "Cuộc phiêu lưu vĩ đại nhất bắt đầu từ một tiếng 'Dạ'",
-  });
 
   const renderSection = () => {
     switch (activeSection) {
       case "home":
-        return <HeroSection info={weddingInfo} onInfoChange={setWeddingInfo} />;
+        return <HeroSection />;
       case "milestones":
         return <MilestoneTimeline />;
       case "guests":
@@ -29,7 +22,7 @@ const Index = () => {
       case "tips":
         return <WeddingTips />;
       default:
-        return <HeroSection info={weddingInfo} onInfoChange={setWeddingInfo} />;
+        return <HeroSection />;
     }
   };
 

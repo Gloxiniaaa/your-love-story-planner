@@ -14,7 +14,7 @@ const DeleteButton = ({ onDelete, size = 14, className = "" }: DeleteButtonProps
 
   useEffect(() => {
     if (confirming) {
-      timeoutRef.current = setTimeout(() => setConfirming(false), 2500);
+      timeoutRef.current = setTimeout(() => setConfirming(false), 2000);
     }
     return () => clearTimeout(timeoutRef.current);
   }, [confirming]);
