@@ -1,4 +1,5 @@
 export interface WeddingInfo {
+  id?: string; // needed for invitation link
   name1: string;
   name2: string;
   date: string; // UI format: dd/mm/yyyy
@@ -7,6 +8,7 @@ export interface WeddingInfo {
 }
 
 export interface WeddingDto {
+  id?: string;
   name1: string;
   name2: string;
   date: string; // API format: ISO date-time string
@@ -35,6 +37,7 @@ export function dmyToIso(dmy: string): string {
 
 export function dtoToWeddingInfo(dto: WeddingDto): WeddingInfo {
   return {
+    id: dto.id,
     name1: dto.name1 ?? "",
     name2: dto.name2 ?? "",
     date: dto.date ? isoToDMY(dto.date) : "",

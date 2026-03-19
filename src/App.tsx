@@ -21,6 +21,7 @@ const App = () => (
           <Route path="/auth" element={<Auth />} />
           <Route path="/login" element={<Auth />} />
           <Route path="/invitation" element={<Invitation />} />
+          <Route path="/invitation/:weddingId" element={<Invitation />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/" element={<Index />} />
           </Route>

@@ -1,23 +1,32 @@
-import { useLocation } from "react-router-dom";
-import HeroSection, { WeddingInfo } from "@/components/HeroSection";
+import { useLocation, useParams } from "react-router-dom";
+import HeroSection from "@/components/HeroSection";
 import MilestoneTimelineReadOnly from "@/components/MilestoneTimelineReadOnly";
-
-const defaultInfo: WeddingInfo = {
-  name1: "Minh",
-  name2: "Anh",
-  date: "15/12/2026",
-  location: "Hà Nội",
-  tagline: "Cuộc phiêu lưu vĩ đại nhất bắt đầu từ một tiếng 'Dạ'",
-};
+import { useInvitation } from "@/api/Invitation/queries";
 
 const Invitation = () => {
   const location = useLocation();
-  const info: WeddingInfo = location.state?.weddingInfo || defaultInfo;
+  const { weddingId } = useParams<{ weddingId: string }>();
+  const invitationQuery = useInvitation(weddingId);
+
+  const fallbackInfo = location.state?.weddingInfo;
+  const wedding = invitationQuery.data?.wedding ?? fallbackInfo;
+  const milestones = invitationQuery.data?.milestones;
 
   return (
     <div className="min-h-screen bg-background">
-      <HeroSection info={info} readOnly />
-      <MilestoneTimelineReadOnly />
+      {wedding ? (
+        <HeroSection info={wedding} readOnly />
+      ) : invitationQuery.isLoading ? (
+        <div className="min-h-screen paper-texture flex items-center justify-center">
+          <p className="font-body text-muted-foreground">Đang tải thiệp mời…</p>
+        </div>
+      ) : (
+        <div className="min-h-screen paper-texture flex items-center justify-center">
+          <p className="font-body text-destructive">Không tìm thấy thiệp mời.</p>
+        </div>
+      )}
+
+      <MilestoneTimelineReadOnly milestones={milestones} />
     </div>
   );
 };

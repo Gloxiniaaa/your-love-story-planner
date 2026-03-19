@@ -173,7 +173,14 @@ const HeroSection = ({ info, onInfoChange, readOnly = false }: HeroSectionProps)
             transition={{ duration: 0.6, delay: 1.3, ease: [0.34, 1.56, 0.64, 1] }}
             whileHover={{ scale: 1.02 }}
             whileTap={{ scale: 0.98, y: 2 }}
-            onClick={() => navigate("/invitation", { state: { weddingInfo: data } })}
+            onClick={() => {
+              const id = (data as any)?.id;
+              if (id) {
+                window.open(`/invitation/${id}`, "_blank", "noopener,noreferrer");
+                return;
+              }
+              navigate("/invitation", { state: { weddingInfo: data } });
+            }}
             className="bg-primary text-primary-foreground px-10 py-4 rounded-2xl shadow-button active:shadow-none active:translate-y-[2px] transition-all font-body font-semibold text-lg"
           >
             Gửi Lời Mời 💌

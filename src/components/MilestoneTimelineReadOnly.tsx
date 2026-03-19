@@ -1,21 +1,13 @@
 import { motion } from "framer-motion";
 import BalloonSvg from "./BalloonSvg";
-
-interface Milestone {
-  id: string;
-  title: string;
-  subtitle: string;
-  date: string;
-  completed: boolean;
-  emoji: string;
-}
+import type { Milestone } from "@/api/Milestone/types";
 
 const parseDateDMY = (d: string) => {
   const [day, month, year] = d.split("/").map(Number);
   return new Date(year, month - 1, day).getTime();
 };
 
-const milestones: Milestone[] = [
+const defaultMilestones: Milestone[] = [
   { id: "1", title: "Lễ Dạm Ngõ", subtitle: "Lễ chạm ngõ — gặp gỡ hai gia đình", date: "01/06/2025", completed: true, emoji: "🏠" },
   { id: "2", title: "Lễ Ăn Hỏi", subtitle: "Lễ đính hôn — trao tráp và sính lễ", date: "01/09/2025", completed: true, emoji: "🎁" },
   { id: "3", title: "Lễ Cưới Nhà Trai", subtitle: "Đám cưới bên nhà trai", date: "14/12/2025", completed: false, emoji: "🎊" },
@@ -24,9 +16,12 @@ const milestones: Milestone[] = [
   { id: "6", title: "Tuần Trăng Mật", subtitle: "Khoảng thời gian cho riêng hai người", date: "20/12/2025", completed: false, emoji: "✈️" },
 ];
 
-const sorted = [...milestones].sort((a, b) => parseDateDMY(a.date) - parseDateDMY(b.date));
+interface MilestoneTimelineReadOnlyProps {
+  milestones?: Milestone[];
+}
 
-const MilestoneTimelineReadOnly = () => {
+const MilestoneTimelineReadOnly = ({ milestones = defaultMilestones }: MilestoneTimelineReadOnlyProps) => {
+  const sorted = [...milestones].sort((a, b) => parseDateDMY(a.date) - parseDateDMY(b.date));
   const completedCount = milestones.filter((m) => m.completed).length;
 
   return (
