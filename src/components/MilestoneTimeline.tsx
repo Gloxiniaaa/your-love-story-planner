@@ -4,6 +4,14 @@ import { Plus, Pencil } from "lucide-react";
 import BalloonSvg from "./BalloonSvg";
 import DeleteButton from "./DeleteButton";
 import {
+  useCreateMilestone,
+  useDeleteMilestone,
+  useMilestones,
+  useToggleMilestone,
+  useUpdateMilestone,
+} from "@/api/Milestone/queries";
+import type { Milestone } from "@/api/Milestone/types";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -12,15 +20,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-
-interface Milestone {
-  id: string;
-  title: string;
-  subtitle: string;
-  date: string;
-  completed: boolean;
-  emoji: string;
-}
 
 const parseDateDMY = (d: string) => {
   const [day, month, year] = d.split("/").map(Number);
@@ -46,17 +45,33 @@ interface MilestoneForm {
 const emptyForm: MilestoneForm = { title: "", subtitle: "", date: "", emoji: "🎉" };
 
 const MilestoneTimeline = () => {
-  const [milestones, setMilestones] = useState(initialMilestones);
+  const hasToken = !!localStorage.getItem("access_token");
+  const milestonesQuery = useMilestones();
+  const createMutation = useCreateMilestone();
+  const toggleMutation = useToggleMilestone();
+  const updateMutation = useUpdateMilestone();
+  const deleteMutation = useDeleteMilestone();
+
+  const [localMilestones, setLocalMilestones] = useState(initialMilestones);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editing, setEditing] = useState<Milestone | null>(null);
   const [form, setForm] = useState<MilestoneForm>(emptyForm);
 
+  const milestones = hasToken ? milestonesQuery.data ?? [] : localMilestones;
   const sorted = [...milestones].sort((a, b) => parseDateDMY(a.date) - parseDateDMY(b.date));
 
   const toggleMilestone = (id: string) => {
-    setMilestones((prev) =>
-      prev.map((m) => (m.id === id ? { ...m, completed: !m.completed } : m))
-    );
+    const m = milestones.find((x) => x.id === id);
+    if (!m) return;
+
+    if (!hasToken) {
+      setLocalMilestones((prev) =>
+        prev.map((x) => (x.id === id ? { ...x, completed: !x.completed } : x))
+      );
+      return;
+    }
+
+    toggleMutation.mutate(id);
   };
 
   const openAdd = () => {
@@ -74,23 +89,41 @@ const MilestoneTimeline = () => {
   const handleSave = () => {
     if (!form.title.trim() || !form.date.trim()) return;
     if (editing) {
-      setMilestones((prev) =>
-        prev.map((m) => (m.id === editing.id ? { ...m, ...form } : m))
-      );
+      if (!hasToken) {
+        setLocalMilestones((prev) =>
+          prev.map((m) => (m.id === editing.id ? { ...m, ...form } : m))
+        );
+      } else {
+        updateMutation.mutate({ id: editing.id, data: { ...form } });
+      }
     } else {
-      setMilestones((prev) => [
-        ...prev,
-        { id: Date.now().toString(), ...form, completed: false },
-      ]);
+      if (!hasToken) {
+        setLocalMilestones((prev) => [
+          ...prev,
+          { id: Date.now().toString(), ...form, completed: false },
+        ]);
+      } else {
+        createMutation.mutate({ ...form, completed: false });
+      }
     }
     setDialogOpen(false);
   };
 
   const deleteMilestone = (id: string) => {
-    setMilestones((prev) => prev.filter((m) => m.id !== id));
+    if (!hasToken) {
+      setLocalMilestones((prev) => prev.filter((m) => m.id !== id));
+      return;
+    }
+    deleteMutation.mutate(id);
   };
 
   const completedCount = milestones.filter((m) => m.completed).length;
+  const saveError =
+    (createMutation.error as any)?.message ||
+    (toggleMutation.error as any)?.message ||
+    (updateMutation.error as any)?.message ||
+    (deleteMutation.error as any)?.message ||
+    "";
 
   return (
     <section className="min-h-screen py-20 px-4 paper-texture">
@@ -123,11 +156,21 @@ const MilestoneTimeline = () => {
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={openAdd}
+          disabled={hasToken && milestonesQuery.isLoading}
           className="w-full bg-paper rounded-2xl shadow-card p-3 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground transition-colors font-body text-sm mb-8"
         >
           <Plus size={16} />
           <span>Thêm cột mốc mới</span>
         </motion.button>
+
+        {hasToken && milestonesQuery.isLoading && (
+          <p className="font-body text-sm text-muted-foreground mb-6 text-center">Đang tải cột mốc…</p>
+        )}
+        {hasToken && milestonesQuery.isError && (
+          <p className="font-body text-sm text-destructive mb-6 text-center">
+            Không thể tải cột mốc. Vui lòng thử lại.
+          </p>
+        )}
 
         <div className="relative border-l-2 border-dashed border-cinnabar/30 ml-6 pl-8 space-y-12">
           <AnimatePresence mode="popLayout">
@@ -178,7 +221,11 @@ const MilestoneTimeline = () => {
                         >
                           <Pencil size={13} />
                         </button>
-                        <DeleteButton onDelete={() => deleteMilestone(m.id)} size={13} />
+                        <DeleteButton
+                          onDelete={() => deleteMilestone(m.id)}
+                          size={13}
+                          disabled={deleteMutation.isPending}
+                        />
                       </div>
                     </div>
                   </div>
@@ -240,11 +287,22 @@ const MilestoneTimeline = () => {
                 placeholder="01/01/2025"
               />
             </div>
+            {hasToken && saveError && (
+              <p className="text-sm text-destructive font-body">Thao tác thất bại: {saveError}</p>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Hủy</Button>
-            <Button onClick={handleSave} disabled={!form.title.trim() || !form.date.trim()}>
-              {editing ? "Lưu" : "Thêm"}
+            <Button
+              onClick={handleSave}
+              disabled={
+                !form.title.trim() ||
+                !form.date.trim() ||
+                createMutation.isPending ||
+                updateMutation.isPending
+              }
+            >
+              {createMutation.isPending || updateMutation.isPending ? "Đang lưu…" : editing ? "Lưu" : "Thêm"}
             </Button>
           </DialogFooter>
         </DialogContent>

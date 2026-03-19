@@ -6,9 +6,10 @@ interface DeleteButtonProps {
   onDelete: () => void;
   size?: number;
   className?: string;
+  disabled?: boolean;
 }
 
-const DeleteButton = ({ onDelete, size = 14, className = "" }: DeleteButtonProps) => {
+const DeleteButton = ({ onDelete, size = 14, className = "", disabled = false }: DeleteButtonProps) => {
   const [confirming, setConfirming] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
@@ -21,6 +22,7 @@ const DeleteButton = ({ onDelete, size = 14, className = "" }: DeleteButtonProps
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
+    if (disabled) return;
     if (confirming) {
       onDelete();
       setConfirming(false);
@@ -32,8 +34,11 @@ const DeleteButton = ({ onDelete, size = 14, className = "" }: DeleteButtonProps
   return (
     <button
       onClick={handleClick}
+      disabled={disabled}
       className={`p-1 rounded-lg transition-all ${
-        confirming
+        disabled
+          ? "opacity-50 cursor-not-allowed"
+          : confirming
           ? "bg-destructive/15 text-destructive scale-110"
           : "hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
       } ${className}`}
