@@ -64,10 +64,10 @@ const Auth = () => {
       const tokens = await login({ username: username.trim(), password });
       localStorage.setItem("access_token", tokens.accessToken);
       localStorage.setItem("refresh_token", tokens.refreshToken);
-      toast({
-        title: "Đăng nhập thành công",
-        description: "Chào mừng bạn quay lại.",
-      });
+      // toast({
+      //   title: "Đăng nhập thành công",
+      //   description: "Chào mừng bạn quay lại.",
+      // });
       navigate(redirectTo, { replace: true });
     } catch (e: any) {
       const msg =

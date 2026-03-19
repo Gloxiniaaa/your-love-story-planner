@@ -7,7 +7,7 @@ import WeddingTips from "@/components/WeddingTips";
 import { useState } from "react";
 
 const Index = () => {
-  const [activeSection, setActiveSection] = useState("home");
+  const [activeSection, setActiveSection] = useState("tips");
 
   const renderSection = () => {
     switch (activeSection) {
@@ -22,7 +22,7 @@ const Index = () => {
       case "tips":
         return <WeddingTips />;
       default:
-        return <HeroSection />;
+        return <WeddingTips />;
     }
   };
 
