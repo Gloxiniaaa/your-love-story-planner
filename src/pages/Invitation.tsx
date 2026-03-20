@@ -1,6 +1,7 @@
 import { useLocation } from "react-router-dom";
 import HeroSection, { WeddingInfo } from "@/components/HeroSection";
 import MilestoneTimelineReadOnly from "@/components/MilestoneTimelineReadOnly";
+import PhotoGalleryReadOnly from "@/components/PhotoGalleryReadOnly";
 
 const defaultInfo: WeddingInfo = {
   name1: "Minh",
@@ -18,6 +19,7 @@ const Invitation = () => {
     <div className="min-h-screen bg-background">
       <HeroSection info={info} readOnly />
       <MilestoneTimelineReadOnly />
+      <PhotoGalleryReadOnly />
     </div>
   );
 };
