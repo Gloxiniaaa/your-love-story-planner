@@ -1,84 +1,77 @@
 import { useMemo, useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
-import { Button } from "@/components/ui/button";
+import { motion, AnimatePresence } from "framer-motion";
 import { Input } from "@/components/ui/input";
-import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Eye, EyeOff, Heart } from "lucide-react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { toast } from "@/hooks/use-toast";
 import { login, register } from "@/api/Auth/api";
 
-type Mode = "login" | "register";
-
-function useModeFromUrl(): [Mode, (m: Mode) => void] {
-  const location = useLocation();
-  const navigate = useNavigate();
-  const mode = useMemo<Mode>(() => {
-    const p = new URLSearchParams(location.search);
-    return p.get("mode") === "register" ? "register" : "login";
-  }, [location.search]);
-
-  const setMode = (m: Mode) => {
-    const p = new URLSearchParams(location.search);
-    p.set("mode", m);
-    navigate({ pathname: "/auth", search: p.toString() }, { replace: true });
-  };
-
-  return [mode, setMode];
-}
-
 const Auth = () => {
-  const navigate = useNavigate();
   const location = useLocation();
-  const { toast } = useToast();
-
-  const [mode, setMode] = useModeFromUrl();
-  const redirectTo = useMemo(() => {
-    const p = new URLSearchParams(location.search);
-    return p.get("redirect") || "/";
-  }, [location.search]);
+  const [showPassword, setShowPassword] = useState(false);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const navigate = useNavigate();
 
-  const sessionExpired = useMemo(() => {
-    const p = new URLSearchParams(location.search);
-    return p.get("session_expired") === "true";
+  const isLogin = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    const mode = params.get("mode");
+    return mode !== "register";
   }, [location.search]);
 
-  const canSubmit = username.trim().length > 0 && password.trim().length > 0 && !busy;
+  const redirectTo = useMemo(() => {
+    const params = new URLSearchParams(location.search);
+    return params.get("redirect") || "/";
+  }, [location.search]);
 
-  const onSubmit = async () => {
-    if (!canSubmit) return;
+  const setMode = (mode: "login" | "register") => {
+    const params = new URLSearchParams(location.search);
+    params.set("mode", mode);
+    navigate({ pathname: "/auth", search: params.toString() }, { replace: true });
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!username.trim() || !password.trim()) {
+      toast({ title: "Vui lòng điền đầy đủ thông tin", variant: "destructive" });
+      return;
+    }
+
+    if (!isLogin && password !== confirmPassword) {
+      toast({ title: "Mật khẩu không khớp", variant: "destructive" });
+      return;
+    }
+
     setBusy(true);
     try {
-      if (mode === "register") {
+      if (!isLogin) {
         await register({ username: username.trim(), password });
-        toast({
-          title: "Tạo tài khoản thành công",
-          description: "Bạn có thể đăng nhập ngay bây giờ.",
-        });
+        toast({ title: "Đăng ký thành công! 🎉" });
+        setConfirmPassword("");
         setMode("login");
-        setPassword("");
         return;
       }
 
       const tokens = await login({ username: username.trim(), password });
       localStorage.setItem("access_token", tokens.accessToken);
       localStorage.setItem("refresh_token", tokens.refreshToken);
-      // toast({
-      //   title: "Đăng nhập thành công",
-      //   description: "Chào mừng bạn quay lại.",
-      // });
+      // toast({ title: "Đăng nhập thành công! 🎉" });
       navigate(redirectTo, { replace: true });
-    } catch (e: any) {
+    } catch (err: any) {
       const msg =
-        e?.response?.data?.message ||
-        e?.response?.data?.title ||
-        e?.message ||
+        err?.response?.data?.message ||
+        err?.response?.data?.title ||
+        err?.message ||
         "Có lỗi xảy ra, vui lòng thử lại.";
       toast({
-        variant: "destructive",
-        title: mode === "register" ? "Đăng ký thất bại" : "Đăng nhập thất bại",
+        title: isLogin ? "Đăng nhập thất bại" : "Đăng ký thất bại",
         description: String(msg),
+        variant: "destructive",
       });
     } finally {
       setBusy(false);
@@ -86,86 +79,130 @@ const Auth = () => {
   };
 
   return (
-    <div className="min-h-screen paper-texture flex items-center justify-center px-4 py-16">
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="w-full max-w-md bg-paper/90 backdrop-blur-sm rounded-3xl shadow-warm p-6 sm:p-8"
-      >
-        <div className="text-center mb-6">
-          <p className="font-handwritten text-xl text-cinnabar mb-2">
-            {mode === "register" ? "Bắt đầu hành trình" : "Chào mừng trở lại"}
-          </p>
-          <h1 className="font-display text-3xl sm:text-4xl font-bold text-foreground">
-            {mode === "register" ? "Tạo tài khoản" : "Đăng nhập"}
+    <section className="min-h-screen flex items-center justify-center px-4 py-20 paper-texture">
+      <div className="w-full max-w-md">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="text-center mb-10"
+        >
+          <Heart className="w-8 h-8 text-primary mx-auto mb-3" />
+          <p className="font-handwritten text-xl text-cinnabar mb-1">Chào mừng bạn</p>
+          <h1 className="font-display text-4xl font-bold text-foreground">
+            {isLogin ? "Đăng Nhập" : "Đăng Ký"}
           </h1>
-          {sessionExpired && (
-            <p className="font-body text-sm text-destructive mt-3">
-              Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.
-            </p>
-          )}
-        </div>
+        </motion.div>
 
-        <div className="flex items-center gap-2 bg-muted rounded-2xl p-1 mb-6">
-          <button
-            type="button"
-            onClick={() => setMode("login")}
-            className={`flex-1 rounded-xl px-3 py-2 text-sm font-body font-semibold transition-colors ${
-              mode === "login" ? "bg-paper shadow-card text-foreground" : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Đăng nhập
-          </button>
-          <button
-            type="button"
-            onClick={() => setMode("register")}
-            className={`flex-1 rounded-xl px-3 py-2 text-sm font-body font-semibold transition-colors ${
-              mode === "register"
-                ? "bg-paper shadow-card text-foreground"
-                : "text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            Đăng ký
-          </button>
-        </div>
+        {/* Card */}
+        <motion.div
+          initial={{ opacity: 0, y: 30, rotate: -1 }}
+          animate={{ opacity: 1, y: 0, rotate: -1 }}
+          whileHover={{ rotate: 0, scale: 1.01 }}
+          transition={{ duration: 0.5, ease: [0.34, 1.56, 0.64, 1] }}
+          className="relative bg-paper rounded-2xl p-8 shadow-card"
+        >
+          {/* Tape */}
+          <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-16 h-5 bg-gold-light/70 rounded-sm rotate-[-2deg]" />
 
-        <div className="space-y-4">
-          <div>
-            <label className="font-body text-sm text-muted-foreground mb-1 block">Tài khoản</label>
-            <Input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="username" />
-          </div>
-          <div>
-            <label className="font-body text-sm text-muted-foreground mb-1 block">Mật khẩu</label>
-            <Input
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              type="password"
-              onKeyDown={(e) => {
-                if (e.key === "Enter") onSubmit();
-              }}
-            />
-          </div>
+          <form onSubmit={handleSubmit} className="space-y-5 mt-2">
+            <div className="space-y-2">
+              <Label htmlFor="username" className="font-display text-sm font-semibold text-foreground">
+                Tên đăng nhập
+              </Label>
+              <Input
+                id="username"
+                type="text"
+                placeholder="Nhập tên đăng nhập..."
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="bg-background/50 border-border font-body"
+                maxLength={50}
+              />
+            </div>
 
-          <Button className="w-full rounded-2xl" onClick={onSubmit} disabled={!canSubmit}>
-            {busy ? "Đang xử lý…" : mode === "register" ? "Tạo tài khoản" : "Đăng nhập"}
-          </Button>
+            <div className="space-y-2">
+              <Label htmlFor="password" className="font-display text-sm font-semibold text-foreground">
+                Mật khẩu
+              </Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Nhập mật khẩu..."
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="bg-background/50 border-border font-body pr-10"
+                  maxLength={100}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
 
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={() => navigate("/", { replace: true })}
-              className="font-body text-sm text-muted-foreground hover:text-foreground underline-offset-4 hover:underline"
+            <AnimatePresence mode="wait">
+              {!isLogin && (
+                <motion.div
+                  key="confirm"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="space-y-2 overflow-hidden"
+                >
+                  <Label htmlFor="confirmPassword" className="font-display text-sm font-semibold text-foreground">
+                    Xác nhận mật khẩu
+                  </Label>
+                  <Input
+                    id="confirmPassword"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Nhập lại mật khẩu..."
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="bg-background/50 border-border font-body"
+                    maxLength={100}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <Button
+              type="submit"
+              className="w-full font-display text-base font-bold rounded-full shadow-button active:translate-y-1 active:shadow-none transition-all"
+              size="lg"
+              disabled={busy}
             >
-              Quay về trang chính
-            </button>
-          </div>
-        </div>
-      </motion.div>
-    </div>
+              {busy ? "Đang xử lý…" : isLogin ? "Đăng Nhập ✨" : "Đăng Ký ✨"}
+            </Button>
+          </form>
+        </motion.div>
+
+        {/* Toggle */}
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="text-center font-body text-sm text-muted-foreground mt-8"
+        >
+          {isLogin ? "Chưa có tài khoản?" : "Đã có tài khoản?"}{" "}
+          <button
+            type="button"
+            onClick={() => {
+              setMode(isLogin ? "register" : "login");
+              setConfirmPassword("");
+            }}
+            className="font-semibold text-primary hover:underline underline-offset-4 transition-colors"
+          >
+            {isLogin ? "Đăng ký ngay" : "Đăng nhập"}
+          </button>
+        </motion.p>
+      </div>
+    </section>
   );
 };
 
 export default Auth;
-
