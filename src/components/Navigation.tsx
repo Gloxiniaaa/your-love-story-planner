@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Heart, Users, Calendar, Wallet, Lightbulb } from "lucide-react";
+import { Heart, Users, Calendar, Wallet, Lightbulb, Camera } from "lucide-react";
 
 interface NavigationProps {
   activeSection: string;
@@ -10,6 +10,7 @@ const navItems = [
   { id: "home", label: "Trang Chủ", icon: Heart },
   { id: "milestones", label: "Cột Mốc", icon: Calendar },
   { id: "guests", label: "Khách Mời", icon: Users },
+  { id: "photos", label: "Ảnh Cưới", icon: Camera },
   { id: "expenses", label: "Chi Phí", icon: Wallet },
   { id: "tips", label: "Mẹo Hay", icon: Lightbulb },
 ];
