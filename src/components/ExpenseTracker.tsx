@@ -2,82 +2,124 @@ import { motion } from "framer-motion";
 import { useState } from "react";
 import { Plus, Pencil, Check, ChevronDown } from "lucide-react";
 import DeleteButton from "./DeleteButton";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Category, Expense, formatVND } from "./expenses/types";
 import { seedCategories } from "./expenses/seedData";
 import ExpenseDialog from "./expenses/ExpenseDialog";
 import CategoryDialog from "./expenses/CategoryDialog";
 import ExpensePieChart from "./expenses/ExpensePieChart";
+import {
+  useCategories,
+  useCreateCategory,
+  useCreateExpense,
+  useDeleteCategory,
+  useDeleteExpense,
+  useToggleExpensePaid,
+  useUpdateCategory,
+  useUpdateExpense,
+} from "@/api/Expense/queries";
 
 const ExpenseTracker = () => {
-  const [categories, setCategories] = useState<Category[]>(seedCategories);
+  const hasToken = !!localStorage.getItem("access_token");
+  const categoriesQuery = useCategories();
+  const createCatMutation = useCreateCategory();
+  const updateCatMutation = useUpdateCategory();
+  const deleteCatMutation = useDeleteCategory();
+  const createExpMutation = useCreateExpense();
+  const updateExpMutation = useUpdateExpense();
+  const toggleExpMutation = useToggleExpensePaid();
+  const deleteExpMutation = useDeleteExpense();
 
-  // Dialogs
+  const [localCategories, setLocalCategories] = useState<Category[]>(seedCategories);
+  const categories = hasToken ? (categoriesQuery.data ?? []) : localCategories;
+
   const [expDlg, setExpDlg] = useState<{ catId: string; expense?: Expense | null } | null>(null);
   const [catDlg, setCatDlg] = useState<{ category?: Category | null } | null>(null);
   const [openCards, setOpenCards] = useState<string[]>([]);
 
-  // Totals
   const allExpenses = categories.flatMap((c) => c.expenses);
   const totalEstimate = allExpenses.reduce((s, e) => s + e.estimateCost, 0);
   const totalActual = allExpenses.reduce((s, e) => s + e.actualCost, 0);
   const totalPaid = allExpenses.filter((e) => e.paid).reduce((s, e) => s + e.actualCost, 0);
   const pct = totalEstimate > 0 ? Math.min((totalActual / totalEstimate) * 100, 100) : 0;
 
-  // Category CRUD
   const addCategory = (data: { name: string; emoji: string }) => {
-    setCategories((prev) => [
-      { id: Date.now().toString(), name: data.name, emoji: data.emoji, expenses: [] },
-      ...prev,
-    ]);
+    if (hasToken) {
+      createCatMutation.mutate(data);
+    } else {
+      setLocalCategories((prev) => [
+        { id: Date.now().toString(), name: data.name, emoji: data.emoji, expenses: [] },
+        ...prev,
+      ]);
+    }
   };
 
   const editCategory = (id: string, data: { name: string; emoji: string }) => {
-    setCategories((prev) => prev.map((c) => (c.id === id ? { ...c, ...data } : c)));
+    if (hasToken) {
+      updateCatMutation.mutate({ id, data });
+    } else {
+      setLocalCategories((prev) => prev.map((c) => (c.id === id ? { ...c, ...data } : c)));
+    }
   };
 
   const deleteCategory = (id: string) => {
-    setCategories((prev) => prev.filter((c) => c.id !== id));
+    if (hasToken) {
+      deleteCatMutation.mutate(id);
+    } else {
+      setLocalCategories((prev) => prev.filter((c) => c.id !== id));
+    }
   };
 
-  // Expense CRUD
   const addExpense = (catId: string, data: Omit<Expense, "id">) => {
-    setCategories((prev) =>
-      prev.map((c) =>
-        c.id === catId
-          ? { ...c, expenses: [{ id: Date.now().toString(), ...data }, ...c.expenses] }
-          : c
-      )
-    );
+    if (hasToken) {
+      createExpMutation.mutate({ categoryId: catId, data });
+    } else {
+      setLocalCategories((prev) =>
+        prev.map((c) =>
+          c.id === catId
+            ? { ...c, expenses: [{ id: Date.now().toString(), ...data }, ...c.expenses] }
+            : c
+        )
+      );
+    }
   };
 
   const editExpense = (catId: string, expId: string, data: Omit<Expense, "id">) => {
-    setCategories((prev) =>
-      prev.map((c) =>
-        c.id === catId
-          ? { ...c, expenses: c.expenses.map((e) => (e.id === expId ? { ...e, ...data } : e)) }
-          : c
-      )
-    );
+    if (hasToken) {
+      updateExpMutation.mutate({ id: expId, data });
+    } else {
+      setLocalCategories((prev) =>
+        prev.map((c) =>
+          c.id === catId
+            ? { ...c, expenses: c.expenses.map((e) => (e.id === expId ? { ...e, ...data } : e)) }
+            : c
+        )
+      );
+    }
   };
 
   const deleteExpense = (catId: string, expId: string) => {
-    setCategories((prev) =>
-      prev.map((c) =>
-        c.id === catId ? { ...c, expenses: c.expenses.filter((e) => e.id !== expId) } : c
-      )
-    );
+    if (hasToken) {
+      deleteExpMutation.mutate(expId);
+    } else {
+      setLocalCategories((prev) =>
+        prev.map((c) => (c.id === catId ? { ...c, expenses: c.expenses.filter((e) => e.id !== expId) } : c))
+      );
+    }
   };
 
   const togglePaid = (catId: string, expId: string) => {
-    setCategories((prev) =>
-      prev.map((c) =>
-        c.id === catId
-          ? { ...c, expenses: c.expenses.map((e) => (e.id === expId ? { ...e, paid: !e.paid } : e)) }
-          : c
-      )
-    );
+    if (hasToken) {
+      toggleExpMutation.mutate(expId);
+    } else {
+      setLocalCategories((prev) =>
+        prev.map((c) =>
+          c.id === catId
+            ? { ...c, expenses: c.expenses.map((e) => (e.id === expId ? { ...e, paid: !e.paid } : e)) }
+            : c
+        )
+      );
+    }
   };
 
   return (
@@ -92,6 +134,15 @@ const ExpenseTracker = () => {
           <p className="font-handwritten text-xl text-cinnabar mb-2">Quản lý ngân sách</p>
           <h2 className="font-display text-4xl sm:text-5xl font-bold text-foreground mb-4">Chi Phí Đám Cưới</h2>
         </motion.div>
+
+        {hasToken && categoriesQuery.isLoading && (
+          <p className="font-body text-sm text-muted-foreground mb-4 text-center">Đang tải danh sách chi phí…</p>
+        )}
+        {hasToken && categoriesQuery.isError && (
+          <p className="font-body text-sm text-destructive mb-4 text-center">
+            Không thể tải danh sách. Vui lòng thử lại.
+          </p>
+        )}
 
         {/* Summary cards */}
         <motion.div
@@ -138,7 +189,8 @@ const ExpenseTracker = () => {
         <motion.button
           whileTap={{ scale: 0.97 }}
           onClick={() => setCatDlg({ category: null })}
-          className="w-full bg-paper rounded-2xl shadow-card p-3 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground transition-colors font-body text-sm mb-6"
+          disabled={hasToken && categoriesQuery.isLoading}
+          className="w-full bg-paper rounded-2xl shadow-card p-3 flex items-center justify-center gap-2 text-muted-foreground hover:text-foreground transition-colors font-body text-sm mb-6 disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <Plus size={16} />
           <span>Thêm danh mục mới</span>
@@ -195,7 +247,7 @@ const ExpenseTracker = () => {
                     >
                       <Pencil size={13} />
                     </button>
-                    <DeleteButton onDelete={() => deleteCategory(cat.id)} size={13} />
+                    <DeleteButton onDelete={() => deleteCategory(cat.id)} size={13} disabled={deleteCatMutation.isPending} />
                   </div>
                 </div>
 
@@ -256,7 +308,7 @@ const ExpenseTracker = () => {
                                 >
                                   <Pencil size={11} />
                                 </button>
-                                <DeleteButton onDelete={() => deleteExpense(cat.id, exp.id)} size={11} />
+                                <DeleteButton onDelete={() => deleteExpense(cat.id, exp.id)} size={11} disabled={deleteExpMutation.isPending} />
                               </div>
                             </div>
                           ))}
