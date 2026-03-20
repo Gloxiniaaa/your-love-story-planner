@@ -13,16 +13,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-
-interface Guest {
-  id: string;
-  name: string;
-  note: string | null;
-  seatCount: number;
-  confirmed: boolean;
-}
-
-type Side = "groom" | "bride";
+import {
+  useCreateGuest,
+  useDeleteGuest,
+  useGuests,
+  useToggleGuest,
+  useUpdateGuest,
+} from "@/api/Guest/queries";
+import type { Guest, Side } from "@/api/Guest/types";
 
 interface GuestFormData {
   name: string;
@@ -32,26 +30,39 @@ interface GuestFormData {
 
 const emptyForm: GuestFormData = { name: "", note: "", seatCount: 1 };
 
+const defaultGroomGuests: Guest[] = [
+  { id: "1", name: "Ông Nội", note: null, seatCount: 1, confirmed: true, side: "groom" },
+  { id: "2", name: "Bà Nội", note: null, seatCount: 1, confirmed: true, side: "groom" },
+  { id: "3", name: "Chú Ba", note: "Cả gia đình", seatCount: 3, confirmed: false, side: "groom" },
+];
+const defaultBrideGuests: Guest[] = [
+  { id: "4", name: "Ông Ngoại", note: null, seatCount: 1, confirmed: true, side: "bride" },
+  { id: "5", name: "Bà Ngoại", note: null, seatCount: 1, confirmed: true, side: "bride" },
+  { id: "6", name: "Dì Hai", note: "Đi cùng chồng", seatCount: 2, confirmed: true, side: "bride" },
+];
+
 const GuestList = () => {
-  const [groomGuests, setGroomGuests] = useState<Guest[]>([
-    { id: "1", name: "Ông Nội", note: null, seatCount: 1, confirmed: true },
-    { id: "2", name: "Bà Nội", note: null, seatCount: 1, confirmed: true },
-    { id: "3", name: "Chú Ba", note: "Cả gia đình", seatCount: 3, confirmed: false },
-  ]);
-  const [brideGuests, setBrideGuests] = useState<Guest[]>([
-    { id: "1", name: "Ông Ngoại", note: null, seatCount: 1, confirmed: true },
-    { id: "2", name: "Bà Ngoại", note: null, seatCount: 1, confirmed: true },
-    { id: "3", name: "Dì Hai", note: "Đi cùng chồng", seatCount: 2, confirmed: true },
-  ]);
+  const hasToken = !!localStorage.getItem("access_token");
+  const guestsQuery = useGuests();
+  const createMutation = useCreateGuest();
+  const updateMutation = useUpdateGuest();
+  const toggleMutation = useToggleGuest();
+  const deleteMutation = useDeleteGuest();
+
+  const [localGroomGuests, setLocalGroomGuests] = useState<Guest[]>(defaultGroomGuests);
+  const [localBrideGuests, setLocalBrideGuests] = useState<Guest[]>(defaultBrideGuests);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogSide, setDialogSide] = useState<Side>("groom");
   const [editingGuest, setEditingGuest] = useState<Guest | null>(null);
   const [form, setForm] = useState<GuestFormData>(emptyForm);
 
-  const setter = (side: Side) => (side === "groom" ? setGroomGuests : setBrideGuests);
+  const apiGuests = guestsQuery.data ?? [];
+  const groomGuests = hasToken ? apiGuests.filter((g) => g.side === "groom") : localGroomGuests;
+  const brideGuests = hasToken ? apiGuests.filter((g) => g.side === "bride") : localBrideGuests;
+
+  const setter = (side: Side) => (side === "groom" ? setLocalGroomGuests : setLocalBrideGuests);
 
   const openAddDialog = (side: Side) => {
     setDialogSide(side);
@@ -60,8 +71,8 @@ const GuestList = () => {
     setDialogOpen(true);
   };
 
-  const openEditDialog = (side: Side, guest: Guest) => {
-    setDialogSide(side);
+  const openEditDialog = (_side: Side, guest: Guest) => {
+    setDialogSide(guest.side);
     setEditingGuest(guest);
     setForm({ name: guest.name, note: guest.note ?? "", seatCount: guest.seatCount });
     setDialogOpen(true);
@@ -71,38 +82,70 @@ const GuestList = () => {
     if (!form.name.trim()) return;
     const set = setter(dialogSide);
     if (editingGuest) {
-      set((prev) =>
-        prev.map((g) =>
-          g.id === editingGuest.id
-            ? { ...g, name: form.name.trim(), note: form.note.trim() || null, seatCount: Math.max(1, form.seatCount) }
-            : g
-        )
-      );
+      if (hasToken) {
+        updateMutation.mutate(
+          { id: editingGuest.id, data: { name: form.name.trim(), note: form.note.trim() || null, seatCount: Math.max(1, form.seatCount) } },
+          { onSuccess: () => setDialogOpen(false) }
+        );
+      } else {
+        set((prev) =>
+          prev.map((g) =>
+            g.id === editingGuest.id
+              ? { ...g, name: form.name.trim(), note: form.note.trim() || null, seatCount: Math.max(1, form.seatCount) }
+              : g
+          )
+        );
+        setDialogOpen(false);
+      }
     } else {
-      const guest: Guest = {
-        id: Date.now().toString(),
-        name: form.name.trim(),
-        note: form.note.trim() || null,
-        seatCount: Math.max(1, form.seatCount),
-        confirmed: false,
-      };
-      set((prev) => [guest, ...prev]);
+      if (hasToken) {
+        createMutation.mutate(
+          { name: form.name.trim(), note: form.note.trim() || null, seatCount: Math.max(1, form.seatCount), side: dialogSide },
+          { onSuccess: () => setDialogOpen(false) }
+        );
+      } else {
+        const guest: Guest = {
+          id: Date.now().toString(),
+          name: form.name.trim(),
+          note: form.note.trim() || null,
+          seatCount: Math.max(1, form.seatCount),
+          confirmed: false,
+          side: dialogSide,
+        };
+        set((prev) => [guest, ...prev]);
+        setDialogOpen(false);
+      }
     }
-    setDialogOpen(false);
   };
 
-  const removeGuest = (side: Side, id: string) => {
-    setter(side)((prev) => prev.filter((g) => g.id !== id));
+  const removeGuest = (guest: Guest) => {
+    if (hasToken) {
+      deleteMutation.mutate(guest.id);
+    } else {
+      setter(guest.side)((prev) => prev.filter((g) => g.id !== guest.id));
+    }
   };
 
-  const toggleConfirm = (side: Side, id: string) => {
-    setter(side)((prev) => prev.map((g) => (g.id === id ? { ...g, confirmed: !g.confirmed } : g)));
+  const toggleConfirm = (guest: Guest) => {
+    if (hasToken) {
+      toggleMutation.mutate(guest.id);
+    } else {
+      setter(guest.side)((prev) => prev.map((g) => (g.id === guest.id ? { ...g, confirmed: !g.confirmed } : g)));
+    }
   };
 
   const filterGuests = (guests: Guest[]) =>
     searchQuery.trim()
       ? guests.filter((g) => g.name.toLowerCase().includes(searchQuery.toLowerCase()))
       : guests;
+
+  const saveError =
+    (createMutation.error as any)?.message ||
+    (updateMutation.error as any)?.message ||
+    (toggleMutation.error as any)?.message ||
+    (deleteMutation.error as any)?.message ||
+    "";
+  const isSaving = createMutation.isPending || updateMutation.isPending;
 
   const totalGuests = groomGuests.length + brideGuests.length;
   const totalConfirmed = groomGuests.filter((g) => g.confirmed).length + brideGuests.filter((g) => g.confirmed).length;
@@ -162,6 +205,15 @@ const GuestList = () => {
           </div>
         </motion.div>
 
+        {hasToken && guestsQuery.isLoading && (
+          <p className="font-body text-sm text-muted-foreground mb-4 text-center">Đang tải danh sách khách mời…</p>
+        )}
+        {hasToken && guestsQuery.isError && (
+          <p className="font-body text-sm text-destructive mb-4 text-center">
+            Không thể tải danh sách. Vui lòng thử lại.
+          </p>
+        )}
+
         {/* Search bar */}
         <div className="relative mb-6">
           <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -182,8 +234,10 @@ const GuestList = () => {
             side="groom"
             onAdd={() => openAddDialog("groom")}
             onEdit={(g) => openEditDialog("groom", g)}
-            onRemove={(id) => removeGuest("groom", id)}
-            onToggle={(id) => toggleConfirm("groom", id)}
+            onRemove={(g) => removeGuest(g)}
+            onToggle={(g) => toggleConfirm(g)}
+            addDisabled={hasToken && guestsQuery.isLoading}
+            deletePending={deleteMutation.isPending}
           />
           <GuestCard
             title="Nhà Gái 👰"
@@ -192,8 +246,10 @@ const GuestList = () => {
             side="bride"
             onAdd={() => openAddDialog("bride")}
             onEdit={(g) => openEditDialog("bride", g)}
-            onRemove={(id) => removeGuest("bride", id)}
-            onToggle={(id) => toggleConfirm("bride", id)}
+            onRemove={(g) => removeGuest(g)}
+            onToggle={(g) => toggleConfirm(g)}
+            addDisabled={hasToken && guestsQuery.isLoading}
+            deletePending={deleteMutation.isPending}
           />
         </div>
       </div>
@@ -234,11 +290,14 @@ const GuestList = () => {
                 rows={2}
               />
             </div>
+            {hasToken && saveError && (
+              <p className="text-sm text-destructive font-body">Thao tác thất bại: {saveError}</p>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Hủy</Button>
-            <Button onClick={handleSave} disabled={!form.name.trim()}>
-              {editingGuest ? "Lưu" : "Thêm"}
+            <Button onClick={handleSave} disabled={!form.name.trim() || isSaving}>
+              {isSaving ? "Đang lưu…" : editingGuest ? "Lưu" : "Thêm"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -256,11 +315,13 @@ interface GuestCardProps {
   side: Side;
   onAdd: () => void;
   onEdit: (guest: Guest) => void;
-  onRemove: (id: string) => void;
-  onToggle: (id: string) => void;
+  onRemove: (guest: Guest) => void;
+  onToggle: (guest: Guest) => void;
+  addDisabled?: boolean;
+  deletePending?: boolean;
 }
 
-const GuestCard = ({ title, guests, tint, side, onAdd, onEdit, onRemove, onToggle }: GuestCardProps) => {
+const GuestCard = ({ title, guests, tint, side, onAdd, onEdit, onRemove, onToggle, addDisabled, deletePending }: GuestCardProps) => {
   const confirmed = guests.filter((g) => g.confirmed).length;
   const seats = guests.reduce((s, g) => s + g.seatCount, 0);
 
@@ -280,10 +341,11 @@ const GuestCard = ({ title, guests, tint, side, onAdd, onEdit, onRemove, onToggl
             </p>
           </div>
           <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.9 }}
+            whileHover={!addDisabled ? { scale: 1.1 } : undefined}
+            whileTap={!addDisabled ? { scale: 0.9 } : undefined}
             onClick={onAdd}
-            className="bg-primary-foreground/20 hover:bg-primary-foreground/30 text-primary-foreground p-2 rounded-xl transition-colors"
+            disabled={addDisabled}
+            className="bg-primary-foreground/20 hover:bg-primary-foreground/30 text-primary-foreground p-2 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Plus size={18} />
           </motion.button>
@@ -303,7 +365,7 @@ const GuestCard = ({ title, guests, tint, side, onAdd, onEdit, onRemove, onToggl
                   className="flex items-center gap-3 p-3 rounded-xl hover:bg-muted/50 transition-colors group"
                 >
                   <button
-                    onClick={() => onToggle(guest.id)}
+                    onClick={() => onToggle(guest)}
                     className={`w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors shrink-0 ${
                       guest.confirmed
                         ? "bg-primary border-primary text-primary-foreground"
@@ -328,7 +390,7 @@ const GuestCard = ({ title, guests, tint, side, onAdd, onEdit, onRemove, onToggl
                     >
                       <Pencil size={13} />
                     </button>
-                    <DeleteButton onDelete={() => onRemove(guest.id)} size={13} />
+                    <DeleteButton onDelete={() => onRemove(guest)} size={13} disabled={deletePending} />
                   </div>
                 </motion.div>
               ))}
