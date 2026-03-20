@@ -11,30 +11,47 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Label } from "@/components/ui/label";
+
+type AspectRatio = "1:1" | "4:3" | "3:4" | "16:9" | "9:16";
 
 interface Photo {
   id: string;
   src: string;
   caption: string;
   rotation: number;
+  aspect: AspectRatio;
 }
 
+const ASPECT_OPTIONS: { value: AspectRatio; label: string; cls: string }[] = [
+  { value: "1:1", label: "1:1", cls: "aspect-square" },
+  { value: "4:3", label: "4:3", cls: "aspect-[4/3]" },
+  { value: "3:4", label: "3:4", cls: "aspect-[3/4]" },
+  { value: "16:9", label: "16:9", cls: "aspect-video" },
+  { value: "9:16", label: "9:16", cls: "aspect-[9/16]" },
+];
+
 const BULB_COLORS = [
-  "hsl(5, 75%, 45%)",    // cinnabar
-  "hsl(35, 85%, 60%)",   // gold
-  "hsl(150, 50%, 45%)",  // green
-  "hsl(210, 60%, 55%)",  // blue
-  "hsl(320, 55%, 50%)",  // pink
-  "hsl(45, 90%, 55%)",   // yellow
+  "hsl(5, 75%, 45%)",
+  "hsl(35, 85%, 60%)",
+  "hsl(150, 50%, 45%)",
+  "hsl(210, 60%, 55%)",
+  "hsl(320, 55%, 50%)",
+  "hsl(45, 90%, 55%)",
 ];
 
 const generateRotation = () => (Math.random() - 0.5) * 8;
+
+const getAspectClass = (aspect: AspectRatio) =>
+  ASPECT_OPTIONS.find((o) => o.value === aspect)?.cls ?? "aspect-square";
 
 const PhotoGallery = () => {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPhoto, setEditingPhoto] = useState<Photo | null>(null);
   const [caption, setCaption] = useState("");
+  const [aspect, setAspect] = useState<AspectRatio>("1:1");
   const [previewFile, setPreviewFile] = useState<string | null>(null);
   const [viewPhoto, setViewPhoto] = useState<Photo | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -46,6 +63,7 @@ const PhotoGallery = () => {
     reader.onload = () => {
       setPreviewFile(reader.result as string);
       setCaption("");
+      setAspect("1:1");
       setEditingPhoto(null);
       setDialogOpen(true);
     };
@@ -56,7 +74,9 @@ const PhotoGallery = () => {
   const handleSave = () => {
     if (editingPhoto) {
       setPhotos((prev) =>
-        prev.map((p) => (p.id === editingPhoto.id ? { ...p, caption } : p))
+        prev.map((p) =>
+          p.id === editingPhoto.id ? { ...p, caption, aspect } : p
+        )
       );
     } else if (previewFile) {
       setPhotos((prev) => [
@@ -65,6 +85,7 @@ const PhotoGallery = () => {
           id: Date.now().toString(),
           src: previewFile,
           caption,
+          aspect,
           rotation: generateRotation(),
         },
       ]);
@@ -77,6 +98,7 @@ const PhotoGallery = () => {
   const openEditCaption = (photo: Photo) => {
     setEditingPhoto(photo);
     setCaption(photo.caption);
+    setAspect(photo.aspect);
     setPreviewFile(null);
     setDialogOpen(true);
   };
@@ -89,7 +111,7 @@ const PhotoGallery = () => {
 
   return (
     <section className="min-h-screen py-20 px-4 paper-texture">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -107,7 +129,6 @@ const PhotoGallery = () => {
 
         {/* Lightbulb chain */}
         <div className="relative mb-8">
-          {/* The string/wire */}
           <svg className="w-full h-8 overflow-visible" preserveAspectRatio="none" viewBox="0 0 1000 40">
             <path
               d="M0,5 Q250,35 500,10 Q750,35 1000,5"
@@ -118,8 +139,6 @@ const PhotoGallery = () => {
               opacity="0.3"
             />
           </svg>
-
-          {/* Bulbs along the wire */}
           <div className="flex justify-around -mt-3 px-8">
             {Array.from({ length: 8 }).map((_, i) => (
               <motion.div
@@ -141,8 +160,8 @@ const PhotoGallery = () => {
           </div>
         </div>
 
-        {/* Photo grid — clipped to the string */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-8 justify-items-center">
+        {/* Photo grid */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-10 justify-items-center">
           <AnimatePresence>
             {displayPhotos.map((photo, i) => (
               <motion.div
@@ -167,9 +186,9 @@ const PhotoGallery = () => {
                 </div>
 
                 {/* Polaroid card */}
-                <div className="bg-paper p-2.5 pb-8 rounded shadow-card w-40 sm:w-48 cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98]">
+                <div className="bg-paper p-3 pb-10 rounded shadow-card w-48 sm:w-56 cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98]">
                   <div
-                    className="relative w-full aspect-[4/3] rounded-sm overflow-hidden bg-muted"
+                    className={`relative w-full ${getAspectClass(photo.aspect)} rounded-sm overflow-hidden bg-muted`}
                     onClick={() => setViewPhoto(photo)}
                   >
                     <img
@@ -188,8 +207,8 @@ const PhotoGallery = () => {
                     {photo.caption || "Chưa có chú thích"}
                   </p>
 
-                  {/* Action buttons */}
-                  <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {/* Action buttons — bottom right */}
+                  <div className="absolute bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -215,7 +234,7 @@ const PhotoGallery = () => {
             whileHover={{ scale: 1.04 }}
             whileTap={{ scale: 0.96 }}
             onClick={() => fileRef.current?.click()}
-            className="bg-paper/60 border-2 border-dashed border-muted-foreground/20 rounded-xl w-40 sm:w-48 aspect-[3/4] flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-cinnabar/40 hover:text-cinnabar transition-colors"
+            className="bg-paper/60 border-2 border-dashed border-muted-foreground/20 rounded-xl w-48 sm:w-56 aspect-square flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-cinnabar/40 hover:text-cinnabar transition-colors"
           >
             <Plus size={28} />
             <span className="font-body text-sm">Thêm ảnh</span>
@@ -236,12 +255,12 @@ const PhotoGallery = () => {
           onChange={handleFileSelect}
         />
 
-        {/* Add / Edit caption dialog */}
+        {/* Add / Edit dialog */}
         <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
               <DialogTitle className="font-display">
-                {editingPhoto ? "Sửa chú thích" : "Thêm ảnh mới"}
+                {editingPhoto ? "Sửa ảnh" : "Thêm ảnh mới"}
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-2">
@@ -255,6 +274,28 @@ const PhotoGallery = () => {
                   <img src={editingPhoto.src} alt="Preview" className="w-full h-full object-cover" />
                 </div>
               )}
+
+              {/* Aspect ratio picker */}
+              <div>
+                <label className="font-body text-sm text-muted-foreground mb-2 block">
+                  Tỷ lệ khung hình
+                </label>
+                <RadioGroup
+                  value={aspect}
+                  onValueChange={(v) => setAspect(v as AspectRatio)}
+                  className="flex flex-wrap gap-3"
+                >
+                  {ASPECT_OPTIONS.map((opt) => (
+                    <div key={opt.value} className="flex items-center gap-1.5">
+                      <RadioGroupItem value={opt.value} id={`aspect-${opt.value}`} />
+                      <Label htmlFor={`aspect-${opt.value}`} className="font-body text-sm cursor-pointer">
+                        {opt.label}
+                      </Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </div>
+
               <div>
                 <label className="font-body text-sm text-muted-foreground mb-1 block">
                   Chú thích

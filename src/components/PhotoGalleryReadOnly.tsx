@@ -3,11 +3,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ZoomIn } from "lucide-react";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 
+type AspectRatio = "1:1" | "4:3" | "3:4" | "16:9" | "9:16";
+
 interface Photo {
   id: string;
   src: string;
   caption: string;
   rotation: number;
+  aspect: AspectRatio;
 }
 
 const BULB_COLORS = [
@@ -19,7 +22,14 @@ const BULB_COLORS = [
   "hsl(45, 90%, 55%)",
 ];
 
-// For demo — in a real app this would come from props/DB
+const ASPECT_MAP: Record<AspectRatio, string> = {
+  "1:1": "aspect-square",
+  "4:3": "aspect-[4/3]",
+  "3:4": "aspect-[3/4]",
+  "16:9": "aspect-video",
+  "9:16": "aspect-[9/16]",
+};
+
 const demoPhotos: Photo[] = [];
 
 interface Props {
@@ -34,7 +44,7 @@ const PhotoGalleryReadOnly = ({ photos = demoPhotos }: Props) => {
 
   return (
     <section className="min-h-[60vh] py-20 px-4 paper-texture">
-      <div className="max-w-4xl mx-auto">
+      <div className="max-w-5xl mx-auto">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -81,7 +91,7 @@ const PhotoGalleryReadOnly = ({ photos = demoPhotos }: Props) => {
         </div>
 
         {/* Photo grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-8 justify-items-center">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-10 justify-items-center">
           <AnimatePresence>
             {displayPhotos.map((photo, i) => (
               <motion.div
@@ -104,10 +114,10 @@ const PhotoGalleryReadOnly = ({ photos = demoPhotos }: Props) => {
                 </div>
 
                 <div
-                  className="bg-paper p-2.5 pb-8 rounded shadow-card w-40 sm:w-48 cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98]"
+                  className="bg-paper p-3 pb-10 rounded shadow-card w-48 sm:w-56 cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98]"
                   onClick={() => setViewPhoto(photo)}
                 >
-                  <div className="relative w-full aspect-[4/3] rounded-sm overflow-hidden bg-muted">
+                  <div className={`relative w-full ${ASPECT_MAP[photo.aspect] ?? "aspect-square"} rounded-sm overflow-hidden bg-muted`}>
                     <img src={photo.src} alt={photo.caption} className="w-full h-full object-cover" />
                     <div className="absolute inset-0 bg-foreground/0 group-hover:bg-foreground/10 transition-colors flex items-center justify-center">
                       <ZoomIn size={24} className="text-primary-foreground opacity-0 group-hover:opacity-80 transition-opacity drop-shadow" />
