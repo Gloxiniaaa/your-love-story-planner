@@ -5,6 +5,7 @@ import GuestList from "@/components/GuestList";
 import ExpenseTracker from "@/components/ExpenseTracker";
 import WeddingTips from "@/components/WeddingTips";
 import { useState } from "react";
+import PhotoGallery from "@/components/PhotoGallery";
 
 const Index = () => {
   const [activeSection, setActiveSection] = useState("tips");
@@ -17,6 +18,8 @@ const Index = () => {
         return <MilestoneTimeline />;
       case "guests":
         return <GuestList />;
+      case "photos":
+        return <PhotoGallery />;
       case "expenses":
         return <ExpenseTracker />;
       case "tips":
