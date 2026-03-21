@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Pencil, ZoomIn } from "lucide-react";
 import DeleteButton from "./DeleteButton";
@@ -13,15 +13,19 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-
-type AspectRatio = "1:1" | "4:3" | "3:4" | "16:9" | "9:16";
+import { usePhotos, useUploadPhoto, useUpdatePhoto, useDeletePhoto } from "@/api/Photo/queries";
+import type { AspectRatio } from "@/api/Photo/types";
 
 interface Photo {
   id: string;
-  src: string;
+  imageUrl: string;
   caption: string;
   rotation: number;
-  aspect: AspectRatio;
+  aspectRatio: AspectRatio;
+}
+
+interface LocalPhotoWithRotation extends Photo {
+  src?: string; // For local preview only
 }
 
 const ASPECT_OPTIONS: { value: AspectRatio; label: string }[] = [
@@ -30,7 +34,7 @@ const ASPECT_OPTIONS: { value: AspectRatio; label: string }[] = [
   { value: "3:4", label: "3:4" },
   { value: "16:9", label: "16:9" },
   { value: "9:16", label: "9:16" },
-];
+] as const;
 
 const ASPECT_RATIOS: Record<AspectRatio, number> = {
   "1:1":  1 / 1,
@@ -38,7 +42,7 @@ const ASPECT_RATIOS: Record<AspectRatio, number> = {
   "3:4":  3 / 4,
   "16:9": 16 / 9,
   "9:16": 9 / 16,
-};
+} as const;
 
 const BULB_COLORS = [
   "hsl(5, 75%, 45%)",
@@ -65,21 +69,51 @@ const getCardWidth = (aspect: AspectRatio): number => {
 };
 
 const PhotoGallery = () => {
-  const [photos, setPhotos] = useState<Photo[]>([]);
+  // Authentication and API hooks
+  const hasToken = !!localStorage.getItem("access_token");
+  const photosQuery = usePhotos();
+  const uploadMutation = useUploadPhoto();
+  const updateMutation = useUpdatePhoto();
+  const deleteMutation = useDeletePhoto();
+
+  // Local state
+  const [localPhotos, setLocalPhotos] = useState<LocalPhotoWithRotation[]>([]);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingPhoto, setEditingPhoto] = useState<Photo | null>(null);
   const [caption, setCaption] = useState("");
   const [aspect, setAspect] = useState<AspectRatio>("1:1");
-  const [previewFile, setPreviewFile] = useState<string | null>(null);
+  const [previewFile, setPreviewFile] = useState<{ file: File; dataUrl: string } | null>(null);
   const [viewPhoto, setViewPhoto] = useState<Photo | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  // Determine which photos to display
+  const photosData = useMemo(() => {
+    if (hasToken) {
+      return (photosQuery.data ?? []).map((p) => ({
+        ...p,
+        rotation: (Math.random() - 0.5) * 8,
+      }));
+    }
+    return localPhotos;
+  }, [hasToken, photosQuery.data, localPhotos]);
+
+  // Extract error messages from mutations
+  const uploadError = (uploadMutation.error as any)?.message || "";
+  const updateError = (updateMutation.error as any)?.message || "";
+  const deleteError = (deleteMutation.error as any)?.message || "";
+  const queryError = photosQuery.isError ? "Không thể tải ảnh. Vui lòng thử lại." : "";
+  const errorMessage = uploadError || updateError || deleteError || queryError;
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     const reader = new FileReader();
     reader.onload = () => {
-      setPreviewFile(reader.result as string);
+      setPreviewFile({
+        file,
+        dataUrl: reader.result as string,
+      });
       setCaption("");
       setAspect("1:1");
       setEditingPhoto(null);
@@ -89,43 +123,80 @@ const PhotoGallery = () => {
     e.target.value = "";
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (editingPhoto) {
-      setPhotos((prev) =>
-        prev.map((p) =>
-          p.id === editingPhoto.id ? { ...p, caption, aspect } : p
-        )
-      );
+      // Update metadata via API or local state
+      if (hasToken) {
+        updateMutation.mutate({
+          id: editingPhoto.id,
+          data: { caption, aspectRatio: aspect },
+        });
+      } else {
+        // Update local photo
+        setLocalPhotos((prev) =>
+          prev.map((p) =>
+            p.id === editingPhoto.id ? { ...p, caption, aspectRatio: aspect } : p
+          )
+        );
+      }
     } else if (previewFile) {
-      setPhotos((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString(),
-          src: previewFile,
+      // Upload new photo via API or local state
+      if (hasToken) {
+        uploadMutation.mutate({
+          file: previewFile.file,
           caption,
-          aspect,
-          rotation: generateRotation(),
-        },
-      ]);
+          aspectRatio: aspect,
+        });
+      } else {
+        // Add to local state
+        setLocalPhotos((prev) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            imageUrl: previewFile.dataUrl,
+            caption,
+            aspectRatio: aspect,
+            rotation: generateRotation(),
+          },
+        ]);
+      }
     }
+
+    // Close dialog on local state updates (API updates don't auto-close)
+    if (!hasToken) {
+      setDialogOpen(false);
+      setPreviewFile(null);
+      setEditingPhoto(null);
+    }
+  };
+
+  // Close dialog when mutations succeed
+  if (uploadMutation.isSuccess || updateMutation.isSuccess) {
     setDialogOpen(false);
     setPreviewFile(null);
     setEditingPhoto(null);
-  };
+    // Reset mutation state
+    uploadMutation.reset?.();
+    updateMutation.reset?.();
+  }
 
   const openEditCaption = (photo: Photo) => {
     setEditingPhoto(photo);
     setCaption(photo.caption);
-    setAspect(photo.aspect);
+    setAspect(photo.aspectRatio);
     setPreviewFile(null);
     setDialogOpen(true);
   };
 
   const deletePhoto = (id: string) => {
-    setPhotos((prev) => prev.filter((p) => p.id !== id));
+    if (hasToken) {
+      deleteMutation.mutate(id);
+    } else {
+      setLocalPhotos((prev) => prev.filter((p) => p.id !== id));
+    }
   };
 
-  const displayPhotos = photos.slice(0, 6);
+  const displayPhotos = photosData.slice(0, 6);
 
   return (
     <section className="min-h-screen py-20 px-4 paper-texture">
@@ -141,8 +212,18 @@ const PhotoGallery = () => {
             Ảnh Cưới
           </h2>
           <p className="font-body text-muted-foreground">
-            {photos.length} bức ảnh kỷ niệm
+            {photosData.length} bức ảnh kỷ niệm
           </p>
+
+          {/* Loading state */}
+          {hasToken && photosQuery.isLoading && (
+            <p className="font-body text-sm text-muted-foreground mt-2">Đang tải ảnh…</p>
+          )}
+
+          {/* Query error state */}
+          {hasToken && queryError && (
+            <p className="font-body text-sm text-destructive mt-2">{queryError}</p>
+          )}
         </motion.div>
 
         {/* Lightbulb chain */}
@@ -208,7 +289,7 @@ const PhotoGallery = () => {
                   className="bg-paper rounded shadow-card flex flex-col cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98]"
                   style={{
                     height: CARD_HEIGHT,
-                    width: getCardWidth(photo.aspect),
+                    width: getCardWidth(photo.aspectRatio),
                     padding: `${CARD_PADDING}px ${CARD_PADDING}px ${CARD_PB}px`,
                   }}
                 >
@@ -217,7 +298,7 @@ const PhotoGallery = () => {
                     onClick={() => setViewPhoto(photo)}
                   >
                     <img
-                      src={photo.src}
+                      src={photo.imageUrl}
                       alt={photo.caption}
                       className="w-full h-full object-cover"
                     />
@@ -239,12 +320,17 @@ const PhotoGallery = () => {
                         e.stopPropagation();
                         openEditCaption(photo);
                       }}
-                      className="p-1 rounded-lg bg-paper/80 backdrop-blur-sm hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                      disabled={updateMutation.isPending || deleteMutation.isPending}
+                      className="p-1 rounded-lg bg-paper/80 backdrop-blur-sm hover:bg-muted text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       title="Sửa chú thích"
                     >
                       <Pencil size={12} />
                     </button>
-                    <DeleteButton onDelete={() => deletePhoto(photo.id)} size={12} />
+                    <DeleteButton
+                      onDelete={() => deletePhoto(photo.id)}
+                      disabled={deleteMutation.isPending}
+                      size={12}
+                    />
                   </div>
                 </div>
               </motion.div>
@@ -259,7 +345,8 @@ const PhotoGallery = () => {
             whileHover={{ scale: 1.04 }}
             whileTap={{ scale: 0.96 }}
             onClick={() => fileRef.current?.click()}
-            className="bg-paper/60 border-2 border-dashed border-muted-foreground/20 rounded-xl flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-cinnabar/40 hover:text-cinnabar transition-colors"
+            disabled={photosQuery.isLoading}
+            className="bg-paper/60 border-2 border-dashed border-muted-foreground/20 rounded-xl flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-cinnabar/40 hover:text-cinnabar transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             style={{ height: CARD_HEIGHT, width: getCardWidth("1:1") }}
           >
             <Plus size={28} />
@@ -267,9 +354,9 @@ const PhotoGallery = () => {
           </motion.button>
         </div>
 
-        {photos.length > 6 && (
+        {photosData.length > 6 && (
           <p className="text-center font-body text-sm text-muted-foreground mt-8">
-            Đang hiển thị 6/{photos.length} ảnh
+            Đang hiển thị 6/{photosData.length} ảnh
           </p>
         )}
 
@@ -292,12 +379,12 @@ const PhotoGallery = () => {
             <div className="space-y-4 py-2">
               {previewFile && (
                 <div className="w-full aspect-video rounded-lg overflow-hidden bg-muted">
-                  <img src={previewFile} alt="Preview" className="w-full h-full object-cover" />
+                  <img src={previewFile.dataUrl} alt="Preview" className="w-full h-full object-cover" />
                 </div>
               )}
               {editingPhoto && !previewFile && (
                 <div className="w-full aspect-video rounded-lg overflow-hidden bg-muted">
-                  <img src={editingPhoto.src} alt="Preview" className="w-full h-full object-cover" />
+                  <img src={editingPhoto.imageUrl} alt="Preview" className="w-full h-full object-cover" />
                 </div>
               )}
 
@@ -331,10 +418,31 @@ const PhotoGallery = () => {
                   placeholder="Khoảnh khắc hạnh phúc..."
                 />
               </div>
+
+              {/* Error message display */}
+              {errorMessage && (
+                <p className="text-sm text-destructive font-body">Lỗi: {errorMessage}</p>
+              )}
             </div>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setDialogOpen(false)}>Hủy</Button>
-              <Button onClick={handleSave}>Lưu</Button>
+              <Button
+                variant="outline"
+                onClick={() => setDialogOpen(false)}
+                disabled={uploadMutation.isPending || updateMutation.isPending}
+              >
+                Hủy
+              </Button>
+              <Button
+                onClick={handleSave}
+                disabled={
+                  uploadMutation.isPending ||
+                  updateMutation.isPending ||
+                  (editingPhoto && !caption && !previewFile) ||
+                  (!editingPhoto && !previewFile)
+                }
+              >
+                {uploadMutation.isPending || updateMutation.isPending ? "Đang lưu…" : "Lưu"}
+              </Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -345,7 +453,7 @@ const PhotoGallery = () => {
             {viewPhoto && (
               <div className="space-y-2">
                 <img
-                  src={viewPhoto.src}
+                  src={viewPhoto.imageUrl}
                   alt={viewPhoto.caption}
                   className="w-full max-h-[75vh] object-contain rounded-lg"
                 />
