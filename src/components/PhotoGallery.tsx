@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Plus, Pencil, X, ZoomIn } from "lucide-react";
+import { Plus, Pencil, ZoomIn } from "lucide-react";
 import DeleteButton from "./DeleteButton";
 import {
   Dialog,
@@ -24,13 +24,21 @@ interface Photo {
   aspect: AspectRatio;
 }
 
-const ASPECT_OPTIONS: { value: AspectRatio; label: string; cls: string }[] = [
-  { value: "1:1", label: "1:1", cls: "aspect-square" },
-  { value: "4:3", label: "4:3", cls: "aspect-[4/3]" },
-  { value: "3:4", label: "3:4", cls: "aspect-[3/4]" },
-  { value: "16:9", label: "16:9", cls: "aspect-video" },
-  { value: "9:16", label: "9:16", cls: "aspect-[9/16]" },
+const ASPECT_OPTIONS: { value: AspectRatio; label: string }[] = [
+  { value: "1:1", label: "1:1" },
+  { value: "4:3", label: "4:3" },
+  { value: "3:4", label: "3:4" },
+  { value: "16:9", label: "16:9" },
+  { value: "9:16", label: "9:16" },
 ];
+
+const ASPECT_RATIOS: Record<AspectRatio, number> = {
+  "1:1":  1 / 1,
+  "4:3":  4 / 3,
+  "3:4":  3 / 4,
+  "16:9": 16 / 9,
+  "9:16": 9 / 16,
+};
 
 const BULB_COLORS = [
   "hsl(5, 75%, 45%)",
@@ -43,8 +51,18 @@ const BULB_COLORS = [
 
 const generateRotation = () => (Math.random() - 0.5) * 8;
 
-const getAspectClass = (aspect: AspectRatio) =>
-  ASPECT_OPTIONS.find((o) => o.value === aspect)?.cls ?? "aspect-square";
+// Card metrics (px) — must stay in sync with inline styles
+const CARD_PADDING  = 12; // p-3
+const CARD_PB       = 40; // pb-10 (white area below image)
+const CAPTION_H     = 32; // caption line + mt-2
+const CARD_HEIGHT   = 256; // fixed for all cards
+
+// Derive card width so the image area respects the aspect ratio exactly
+const getCardWidth = (aspect: AspectRatio): number => {
+  const imageH = CARD_HEIGHT - CARD_PADDING - CARD_PB - CAPTION_H;
+  const imageW = imageH * ASPECT_RATIOS[aspect];
+  return Math.round(imageW + CARD_PADDING * 2);
+};
 
 const PhotoGallery = () => {
   const [photos, setPhotos] = useState<Photo[]>([]);
@@ -160,8 +178,8 @@ const PhotoGallery = () => {
           </div>
         </div>
 
-        {/* Photo grid */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-10 justify-items-center">
+        {/* flex-wrap lets variable-width cards flow naturally */}
+        <div className="flex flex-wrap gap-10 justify-center">
           <AnimatePresence>
             {displayPhotos.map((photo, i) => (
               <motion.div
@@ -185,10 +203,17 @@ const PhotoGallery = () => {
                   />
                 </div>
 
-                {/* Polaroid card */}
-                <div className="bg-paper p-3 pb-10 rounded shadow-card w-48 sm:w-56 cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98]">
+                {/* Polaroid card: fixed height, width derived from aspect ratio */}
+                <div
+                  className="bg-paper rounded shadow-card flex flex-col cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98]"
+                  style={{
+                    height: CARD_HEIGHT,
+                    width: getCardWidth(photo.aspect),
+                    padding: `${CARD_PADDING}px ${CARD_PADDING}px ${CARD_PB}px`,
+                  }}
+                >
                   <div
-                    className={`relative w-full ${getAspectClass(photo.aspect)} rounded-sm overflow-hidden bg-muted`}
+                    className="relative flex-1 rounded-sm overflow-hidden bg-muted"
                     onClick={() => setViewPhoto(photo)}
                   >
                     <img
@@ -203,11 +228,11 @@ const PhotoGallery = () => {
                       />
                     </div>
                   </div>
-                  <p className="font-handwritten text-sm text-center mt-2 text-muted-foreground truncate px-1">
+                  <p className="font-handwritten text-sm text-center mt-2 text-muted-foreground truncate px-1 shrink-0">
                     {photo.caption || "Chưa có chú thích"}
                   </p>
 
-                  {/* Action buttons — bottom right */}
+                  {/* Action buttons */}
                   <div className="absolute bottom-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                     <button
                       onClick={(e) => {
@@ -226,7 +251,7 @@ const PhotoGallery = () => {
             ))}
           </AnimatePresence>
 
-          {/* Add button */}
+          {/* Add button — matches card height */}
           <motion.button
             initial={{ opacity: 0 }}
             whileInView={{ opacity: 1 }}
@@ -234,7 +259,8 @@ const PhotoGallery = () => {
             whileHover={{ scale: 1.04 }}
             whileTap={{ scale: 0.96 }}
             onClick={() => fileRef.current?.click()}
-            className="bg-paper/60 border-2 border-dashed border-muted-foreground/20 rounded-xl w-48 sm:w-56 aspect-square flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-cinnabar/40 hover:text-cinnabar transition-colors"
+            className="bg-paper/60 border-2 border-dashed border-muted-foreground/20 rounded-xl flex flex-col items-center justify-center gap-2 text-muted-foreground hover:border-cinnabar/40 hover:text-cinnabar transition-colors"
+            style={{ height: CARD_HEIGHT, width: getCardWidth("1:1") }}
           >
             <Plus size={28} />
             <span className="font-body text-sm">Thêm ảnh</span>
@@ -275,7 +301,6 @@ const PhotoGallery = () => {
                 </div>
               )}
 
-              {/* Aspect ratio picker */}
               <div>
                 <label className="font-body text-sm text-muted-foreground mb-2 block">
                   Tỷ lệ khung hình
